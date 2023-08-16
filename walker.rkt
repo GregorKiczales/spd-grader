@@ -5,6 +5,9 @@
 
 (provide (all-defined-out))
 
+(define TEMPLATE-VARIABLES '(.. ... .... ..... ......))
+
+
 (define BIA-FNS '(foldr foldl map filter andmap ormap build-list))
 
 (define BB-OPTIONS '(on-tick on-key on-key on-release on-mouse to-draw stop-when))
@@ -342,11 +345,14 @@
   (walk-form (datum->syntax #f f0)
              '()
              (lambda (kind stx e ctx env in-fn recur)
-               (if (eqv? e '...)
-                   (list '...)
+               (if (memq e TEMPLATE-VARIABLES)
+                   (list e)
                    (walker-case kind
                      [(value constant null bound free) '()]
-                     [(if cond and or define local local-define local-body lambda call) (recur)]))))) 
+                     [(if cond and or define local local-define local-body lambda call) (recur)])))))
+
+(define (filled? defn)
+  (null? (...s defn)))
 
 
 
