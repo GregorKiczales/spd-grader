@@ -67,6 +67,26 @@
                        (rest low)
                        (rest los)))])))
 
+(define-syntax (weights+ stx)
+  (syntax-case stx ()
+    [(_ . exprs)
+     (let ([es (map syntax-e (syntax-e #'exprs))])
+       (check-well-formed-weights+ stx es)
+       #`(weights #,(map car es)
+                  #,@(map cadr es)))]))
+
+(define-for-syntax (check-well-formed-weights+ stx es)
+  (let loop ([es es]
+             [first? #t])
+    (cond [(not (pair? (car es))) #f]
+          [(number? (syntax-e (caar es))) (loop (cdr es) #f)]
+          [(eqv? (syntax-e (caar es)) '*)
+           (or (null? (cdr es))
+               (raise-syntax-error #f "* can only be used in the last position of weights+." stx (caar es)))]
+          [else
+           (raise-syntax-error #f "should be a number" stx (caar es))])))
+          
+
 (define (total-marks scores)
   (let* ([scores (filter score? scores)]
          [total-weight (foldl + 0 (map score-w scores))])
