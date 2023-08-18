@@ -1232,6 +1232,16 @@ validity, and test thoroughness results are reported. No grade information is re
 	  (if (eof-object? se)
 	      '()
 	      (cons (post-read-convert se) (loop (read)))))))))
+
+(define (read-syntaxes fn)
+  (call-with-input-file fn
+    (lambda (p)
+      (parameterize ([read-accept-reader #t]
+		     [read-case-sensitive #t]
+                     [read-decimal-as-inexact #f] ;to match teaching languages
+		     [current-input-port p])
+
+        (cdr (syntax->list (cadddr (syntax->list (read-syntax fn p)))))))))
   
 
 
