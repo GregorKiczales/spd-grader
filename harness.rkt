@@ -2,22 +2,27 @@
 
 (require "grader.rkt")
 
-(provide grade-all-starters  grade-all-solutions
-         grade-some-starters grade-some-solutions
+(provide grade-some-starters grade-some-solutions
+         grade-exam-starters grade-exam-solutions
+         grade-spd-starters  grade-spd-solutions
+         grade-110-starters  grade-110-solutions   ;!!! factor this 110 stuff out of spd
          grade-one)
 
-(define MATERIALS (build-path (find-system-path 'home-dir) "spd-materials/"))
-(define EXAMS     (build-path MATERIALS "exams/"))
+(define SPD-MATERIALS (build-path (find-system-path 'home-dir) "spd-materials/"))
+(define 110-MATERIALS (build-path (find-system-path 'home-dir) "110-materials/"))
+(define EXAMS         (build-path 110-MATERIALS "exams/"))
 
 
 (define (grade-some-starters  [verbose? #f]) (grade-some #rx".*-starter\\.rkt$"  verbose?))
 (define (grade-some-solutions [verbose? #f]) (grade-some #rx".*-solution\\.rkt$" verbose?))
-(define (grade-many-starters  [verbose? #f]) (grade-many #rx".*-starter\\.rkt$"  verbose?))
-(define (grade-many-solutions [verbose? #f]) (grade-many #rx".*-solution\\.rkt$" verbose?))
+;(define (grade-many-starters  [verbose? #f]) (grade-many #rx".*-starter\\.rkt$"  verbose?))
+;(define (grade-many-solutions [verbose? #f]) (grade-many #rx".*-solution\\.rkt$" verbose?))
 (define (grade-exam-starters  [verbose? #f]) (grade-tree EXAMS #rx".*-starter\\.rkt$"   verbose?))
 (define (grade-exam-solutions [verbose? #f]) (grade-tree EXAMS #rx".*-solution\\.rkt$"  verbose?))
-(define (grade-all-starters   [verbose? #f]) (grade-tree MATERIALS #rx".*-starter\\.rkt$"  verbose?))
-(define (grade-all-solutions  [verbose? #f]) (grade-tree MATERIALS #rx".*-solution\\.rkt$" verbose?))
+(define (grade-spd-starters   [verbose? #f]) (grade-tree SPD-MATERIALS #rx".*-starter\\.rkt$"  verbose?))
+(define (grade-spd-solutions  [verbose? #f]) (grade-tree SPD-MATERIALS #rx".*-solution\\.rkt$" verbose?))
+(define (grade-110-starters   [verbose? #f]) (grade-tree 110-MATERIALS #rx".*-starter\\.rkt$"  verbose?))
+(define (grade-110-solutions  [verbose? #f]) (grade-tree 110-MATERIALS #rx".*-solution\\.rkt$" verbose?))
 
 
 (define (grade-one path [out (current-output-port)])  
@@ -25,7 +30,7 @@
 
 (define (grade-some regexp [verbose? #f])
   (grade-listof-path (directory-list "." #:build? #t) regexp verbose?))
-
+#;
 (define (grade-many regexp [verbose? #f])
   (grade-listof-path (foldr append
                             '()
