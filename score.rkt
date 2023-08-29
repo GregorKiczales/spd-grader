@@ -1,6 +1,7 @@
 #lang racket
 
-(require "utils.rkt"
+(require (for-syntax racket/list)
+         "utils.rkt"
          "defs.rkt")
 
 (provide (all-defined-out))
@@ -12,8 +13,8 @@
 ;;
 ;; (score <header-score?>
 ;;        (one-of TOPICS)
-;;        <out-of>
-;;        <marks>
+;;        <out-of>            ;
+;;        <marks>             ;percentage
 ;;        (list-of Score)
 ;;        (list-of Message))
 
@@ -52,8 +53,60 @@
 
 (define-syntax (weights stx)
   (syntax-case stx (*)
-    [(_ (w ... *) s ...) #'(combine-scores (weights* 1.00 (list w ... '*) (list s ...)))]
-    [(_ (w ...  ) s ...) #'(combine-scores (weights* 1.00 (list w ...   ) (list s ...)))]))
+    [(_ (w ... *) s ...) #`(combine-scores (weights* 1.00 '#,(parse-weights stx #'(w ... *)) (list s ...)))]
+    [(_ (w ...  ) s ...) #`(combine-scores (weights* 1.00 '#,(parse-weights stx #'(w ... ))  (list s ...)))]))
+
+(define-for-syntax (parse-weights stx los)
+  ;; los is #'(list Num | * | (@ Natural Num))
+  (let loop ([los (syntax->list los)])
+    (if (null? los)
+        '()
+        (let* ([s (car los)]
+               [e (syntax-e s)])
+          (cond [(number? e) (cons e (loop (cdr los)))]
+                [(eqv? e '*)
+                 (if (null? (cdr los))
+                     '(*)
+                     (raise-syntax-error #f "Can only use * in the last position in a list of scores." stx s))]
+                [(and (pair? e)
+                      (= (length e) 3)
+                      (eqv? (syntax-e (car e)) '@)
+                      (number? (syntax-e (cadr e))))
+                 (let [(n (syntax-e (cadr e)))
+                       [w (caddr e)]]
+                   (append (apply append (make-list n (parse-weights stx #`(#,w))))
+                           (loop (cdr los))))] 
+                [else
+                 (raise-syntax-error #f "Expecting a percentage weight, (@ Natural <weight>), or *." stx s)])))))
+
+  
+
+(define-syntax (weights+ stx)
+  (syntax-case stx ()
+    [(_ . exprs)
+     (let* ([stxs (syntax-e #'exprs)]
+            [es (map syntax-e stxs)])
+       (check-well-formed-weights+ stx stxs)
+       #`(weights #,(map car es)
+                  #,@(map cadr es)))]))
+
+(define-for-syntax (check-well-formed-weights+ stx stxs)
+  (let loop ([stxs stxs])
+    (or (null? stxs)
+        (let ([last? (null? (cdr stxs))]
+              [e (syntax-e (car stxs))])
+          (cond [(not (pair? e))
+                 (if last?
+                     (raise-syntax-error #f "Expected [<number-or-*> <expression>]" stx (car stxs))
+                     (raise-syntax-error #f "Expected [<number> <expression>]" stx (car stxs)))]
+                [(number? (syntax-e (car e)))             (loop (cdr stxs))]
+                [last?
+                 (or (eqv? (syntax-e (car e)) '*)
+                     (raise-syntax-error #f "Expected number or *." stx (car e)))]
+                [else
+                 (raise-syntax-error #f "Expected number." stx (car e))])))))
+
+
 
 (define (weights* left low los)
   (let loop ([left left] [low low] [los (filter score? los)])
@@ -66,26 +119,7 @@
                  (loop (- left (car low))
                        (rest low)
                        (rest los)))])))
-
-(define-syntax (weights+ stx)
-  (syntax-case stx ()
-    [(_ . exprs)
-     (let ([es (map syntax-e (syntax-e #'exprs))])
-       (check-well-formed-weights+ stx es)
-       #`(weights #,(map car es)
-                  #,@(map cadr es)))]))
-
-(define-for-syntax (check-well-formed-weights+ stx es)
-  (let loop ([es es]
-             [first? #t])
-    (cond [(not (pair? (car es))) #f]
-          [(number? (syntax-e (caar es))) (loop (cdr es) #f)]
-          [(eqv? (syntax-e (caar es)) '*)
-           (or (null? (cdr es))
-               (raise-syntax-error #f "* can only be used in the last position of weights+." stx (caar es)))]
-          [else
-           (raise-syntax-error #f "should be a number" stx (caar es))])))
-          
+         
 
 (define (total-marks scores)
   (let* ([scores (filter score? scores)]
@@ -99,26 +133,17 @@
   (struct-copy %score item [w n]))
 
 
-(define (score-max . scores)
-  (let ([scores (filter score? scores)])
-    (foldl (lambda (s1 s2)
-             (cond [(not (= (score-w s1) (score-w s2)))
-                    (error (format "~a (weighted ~a) and ~a (weighted ~a) should have same weight."
-                                   (score-m s1) (score-w s1)
-                                   (score-m s2) (score-w s2)))]
-                   [(>= (score-m s1) (score-m s2)) s1]
-                   [else s2]))
-           (car scores)
-           (cdr scores))))
+(define (score-max . scores) (apply score-max/min >= scores))
+(define (score-min . scores) (apply score-max/min <= scores))
 
-(define (score-min . scores)
+(define (score-max/min comp . scores)
   (let ([scores (filter score? scores)])
     (foldl (lambda (s1 s2)
              (cond [(not (= (score-w s1) (score-w s2)))
                     (error (format "~a (weighted ~a) and ~a (weighted ~a) should have same weight."
                                    (score-m s1) (score-w s1)
                                    (score-m s2) (score-w s2)))]
-                   [(<= (score-m s1) (score-m s2)) s1]
+                   [(comp (score-m s1) (score-m s2)) s1]
                    [else s2]))
            (car scores)
            (cdr scores))))
