@@ -101,33 +101,39 @@ In this problem you must do two things:
 
 (define-syntax (grade-mcq stx)
   (syntax-case stx ()
-    [(_ case ...) #`(check-mcq  (parse-mcq-cases '(case ...)))]))
+    [(_ case ...)
+     (let-values ([(weights cases) (parse-mcq-cases stx #'(case ...))])
+       #`(check-mcq '#,weights '#,cases))]))
 
-;; move this to handle all grade-... bodies
-(define (parse-mcq-cases raw-cases)
-  (let loop ([raw raw-cases])
-    (cond [(empty? raw) '()]
-          [else
-           (cond [(not (pair? (car raw)))
-                  (raise-syntax-error 'grade-mcq "should be [<weight>] or (equal?|exclusive? <symbol> . <values>)" (car raw))]
-                 [(number? (caar raw))
-                  (if (not (and (pair? (cdr raw))
-                                (pair? (cadr raw))))
-                      (raise-syntax-error 'grade-mcq "must be followed by (equal?|exclusive? <symbol> . <values>)" (car raw))
-                      (cons (list (car (car raw))
-                                  (cadr raw))
-                            (loop (cddr raw))))]
-                 [else
-                  (cons (list '* (car raw)) (loop (cdr raw)))])])))
+(define-for-syntax (parse-mcq-cases stx raw)
+  (let loop ([stxs (syntax-e raw)]
+             [first? #t]
+             [seen-weight? #f]
+             [weights '()]
+             [cases '()])
+    (if (null? stxs)
+        (values (reverse weights) (reverse cases))
+        (let ([d (syntax->datum (car stxs))])
+          (if (weight-and-check? d)
+              (if (or first? seen-weight?)
+                  (loop (cdr stxs) #f #t (cons (car d) weights) (cons (cadr d) cases))
+                  (raise-syntax-error #f "Expecting check without weight." stx (car stxs)))
+              (if (or first? (not seen-weight?))
+                  (loop (cdr stxs) #f #f '() (cons d cases))
+                  (raise-syntax-error #f "Expecting check with weight." stx (car stxs))))))))
 
-(define (check-mcq cases)
-  (let* ([weights  (map car  cases)]
-         [cases    (map cadr cases)]
-         [subs     (map (lambda (c)
-                          (list (cadr c)
-                                (calling-evaluator #f (cadr c))))
-                        cases)])
+(define-for-syntax (weight-and-check? d)
+  (and (= (length d) 2)
+       (or (number? (car d))
+           (eqv? (car d) '*))))
+  
 
+(define (check-mcq weights cases)
+  (let ([subs (map (lambda (c)
+                     (list (cadr c)
+                           (calling-evaluator #f (cadr c))))
+                   cases)])
+    
     (define (check-equal case)
       (let* ([var  (cadr case)]
              [sub  (cadr (assq var subs))]
@@ -170,8 +176,8 @@ In this problem you must do two things:
       
     (combine-scores
      (weights* 1.0
-               (if (memq '* weights)
-                   (append (takef weights number?) '(*))
+               (if (null? weights)
+                   (make-list (length cases) '*)
                    weights)
 
        (for/list ([case cases])
