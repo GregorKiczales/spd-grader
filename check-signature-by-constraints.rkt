@@ -49,7 +49,7 @@
           (combine-scores
            (weights* 1 '(*)
              (for/list ([c constraints])
-               (rubric-item 'signature 1  (check-constraint (cdr sig) c) "~a" (constr-explanation c)))))))
+               (rubric-item 'signature (check-constraint (cdr sig) c) "~a" (constr-explanation c)))))))
 
 (define (check-constraint sig c)
   (with-handlers ([void (lambda (e) #f)])

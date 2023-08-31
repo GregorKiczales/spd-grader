@@ -65,7 +65,7 @@ This solves problems about order of arguments.
     (weights (.50 *)
         
       (if (not (pair? sigs))
-          (rubric-item 'signature 1 #f "Abstract function signature")
+          (rubric-item 'signature #f "Abstract function signature")
           (check-signature-by-constraints (and sigs (car sigs))
                                           (make-constraints-from-signature sig)))
       
@@ -73,7 +73,6 @@ This solves problems about order of arguments.
       (if (not (equal? defn defn2))
           (score-it 'submitted-tests 1 0 #f "Copy test: incorrect (fold function has been edited).")
           (rubric-item 'submitted-tests
-                       1
                        (with-handlers ([void (lambda (e) #f)])
                          (ormap (lambda (ce)
                                   (let ([lhs (cadr ce)]
@@ -86,8 +85,7 @@ This solves problems about order of arguments.
 
       (if (not (equal? defn defn2))
           (score-it 'submitted-tests 1 0 #f "Count test: incorrect (fold function has been edited).")
-          (rubric-item 'submitted-tests
-                       1                
+          (rubric-item 'submitted-tests                
                        (with-handlers ([void (lambda (e) #f)])
                          (ormap (lambda (ce)
                                   (let ([lhs (cadr ce)]

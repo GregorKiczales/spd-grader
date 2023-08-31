@@ -29,17 +29,15 @@
     (weights (.1 .2 *)
       (grade-template-origin (2-one-of))
       (rubric-item 'template
-                   1
                    (and (pair? sub-pairs) (= (length sub-pairs) (length sol-pairs)))
                    "cond reduced to ~a cases" (length sol-pairs))
       (if (not (pair? sub-pairs))
-          (rubric-item 'template 1 #f "~a properly simplified questions" (length sol-pairs))
+          (rubric-item 'template #f "~a properly simplified questions" (length sol-pairs))
           (combine-scores
             (weights* 1.0 '(*)
               (for/list ([n  (in-naturals 0)]
                          [sol-pair sol-pairs])
                 (rubric-item 'template
-                             1
                              (and (> (length sub-pairs) n)
                                   (qequal? (car (list-ref sub-pairs n))
                                            (car sol-pair)

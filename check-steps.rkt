@@ -27,7 +27,8 @@
   (syntax-case stx ()
     [(_ sexp ...)
      #'(with-handlers ([void (lambda (e)
-                               (rubric-item 'evaluation 1 #f
+                               (rubric-item 'evaluation
+                                            #f
                                             "Error grading problem ~s"
                                             (if (exn? e)
                                                 (exn-message e)

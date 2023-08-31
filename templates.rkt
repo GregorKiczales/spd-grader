@@ -49,7 +49,7 @@ Standard directions are:
     [(_ fn-name)
      #'(let ([what (format "~a - natural recursion intact" 'fn-name)])
          (guard-template-fn-grading fn-name 'template-intact what
-                                    (rubric-item 'template-intact 1
+                                    (rubric-item 'template-intact
                                                  (calls? fn-name 'fn-name)
                                                  what)))]))
 
@@ -60,7 +60,7 @@ Standard directions are:
                            'fn-name 
                            (if (null? (cdr '(called-fn ...))) "" "s"))])
          (guard-template-fn-grading fn-name 'template-intact what
-                                    (rubric-item 'template-intact 1
+                                    (rubric-item 'template-intact
                                                  (calls-all? fn-name '(called-fn ...))
                                                  what)))]))
 
@@ -71,7 +71,7 @@ Standard directions are:
                            'fn-name
                            (if (null? (cdr '(called-fn ...))) "" "s"))])
          (guard-template-fn-grading fn-name 'template-intact what
-                                    (rubric-item 'template-intact 1
+                                    (rubric-item 'template-intact
                                                  (calls-all? fn-name '(called-fn ...))
                                                  what)))]))
 
@@ -80,7 +80,7 @@ Standard directions are:
     [(_ fn-name)
      #'(let ([what (format  "~a - no try-catch blended in" 'fn-name)])
          (guard-template-fn-grading fn-name 'template-intact what
-                                    (rubric-item 'template-intact 1
+                                    (rubric-item 'template-intact
                                                  (and fn-name
                                                       (filled? fn-name)
                                                       (has-try-catch? fn-name))
@@ -92,7 +92,7 @@ Standard directions are:
     [(_ fn-name)
      #'(let ([what (format  "~a - try-catch blended in" 'fn-name)])
          (guard-template-fn-grading fn-name 'template-intact what
-                                    (rubric-item 'template-intact 1
+                                    (rubric-item 'template-intact
                                                  (and fn-name
                                                       (filled? fn-name)
                                                       (not (has-try-catch? fn-name)))
@@ -103,7 +103,7 @@ Standard directions are:
     [(_ fn-name qa-pair ...)
      #'(let ([what (format "~a - cond questions intact" 'fn-name)])
          (guard-template-fn-grading fn-name 'template-intact what
-                                    (rubric-item 'template-intact 1
+                                    (rubric-item 'template-intact
                                                  (and fn-name
                                                       (filled? fn-name)
                                                       (let [(cond-expr (get-cond fn-name))]
@@ -117,7 +117,7 @@ Standard directions are:
     [(_ fn-name bad-fns-to-call)
      #'(let ([what (format "~a - does not call any of ~a" 'fn-name 'bad-fns-to-call)])
          (guard-template-fn-grading fn-name 'template-intact what
-                                    (rubric-item 'template-intact 1
+                                    (rubric-item 'template-intact
                                                  (and (filled? fn-name)
                                                       (not (ormap (lambda (bad) (calls? fn-name bad)) 'bad-fns-to-call)))
                                                  what)))]))
