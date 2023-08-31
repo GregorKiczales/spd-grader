@@ -4,21 +4,35 @@
          "utils.rkt"
          "defs.rkt")
 
-(provide (all-defined-out))
+(provide score
+         score-m        ;only score selector exported
+         message
+         score-it
+         rubric-item 
+         header
+         combine-scores
+         weights
+         weights+
+         weights*
+         total-marks
+         score-max
+         score-min
+         score-*
+         display-score)
 
-;;
 ;; Scores
 ;;
 ;
 ;;
 ;; (score <header-score?>
 ;;        (one-of TOPICS)
-;;        <out-of>            ;
-;;        <marks>             ;percentage
+;;        <weight>           ;percentage of enclosing score this score contributes  
+;;        <marks>            ;percentage of its weight this score has
 ;;        (list-of Score)
 ;;        (list-of Message))
 
 (struct score (header? topic w m subs msgs) #:transparent #:name %score #:constructor-name %score)
+
 ;; !!! temporary backward compatibility for old arguments
 (define (score . args)
   (cond [(= (length args) 5)
@@ -27,23 +41,33 @@
          (raise-argument-error 'topic "not (void)" (cadr args))]
         [else
          (apply %score args)]))
-       
-(struct null-score ()) ;use by ensure... to produce nothing ;!!! not used?
 
 (struct msg (v? str) #:transparent)
 ;; Message is (message Boolean String)
 ;;    v? is boolean, #f -> only include in concise
 ;;                   #t -> include in concise and verbose
 
+(define (message verb? form . vs)
+  (msg verb? (apply format form vs)))
 
 (define (score-it topic w m v? fmt-ctl . fmt-args)
   (score #f topic w m '() (list (msg v? (apply format fmt-ctl fmt-args)))))
 
+;(define (rubric-item . args)
+;  ;; the new one doesn't take weight
+  (define (rubric-item topic correct? fmt-ctl . fmt-args)
+    (if correct?
+      (score #f topic 1 1 '() (list (message #f "~a: correct."   (apply format fmt-ctl fmt-args))))
+      (score #f topic 1 0 '() (list (message #f "~a: incorrect." (apply format fmt-ctl fmt-args))))))
+;
+;  (if (number? (cadr args))
+;      (apply rubric-item (cons (car args) (cddr args)))
+;      (apply rubric-item args)))
+
+
+
 (define (header text s)
   (score #t 'other (score-w s) (score-m s) (score-subs s) (list (message #f text))))
-
-(define (message verb? form . vs)
-  (msg verb? (apply format form vs)))
 
 
 (define (combine-scores scores)
