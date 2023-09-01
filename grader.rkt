@@ -291,7 +291,7 @@ validity, and test thoroughness results are reported. No grade information is re
 (define (default-grader)
   (grade-submission 
     (weights (1)
-      (rubric-item 'other 1 #t "No custom grader exists for this starter."))))
+      (rubric-item 'other #t "No custom grader exists for this starter."))))
 
 
 ;; grade-* syntax
@@ -355,7 +355,7 @@ validity, and test thoroughness results are reported. No grade information is re
 
 
 (define (check-sexps desc sub sol)
-  (rubric-item 'other 1 (equal? sub sol) desc))
+  (rubric-item 'other (equal? sub sol) desc))
 
 
 
@@ -363,7 +363,7 @@ validity, and test thoroughness results are reported. No grade information is re
   (syntax-case stx ()
     [(_ type str test item ...)
      #'(if (not test)
-           (rubric-item 'type 1 #f (format "Prerequisite: ~a" str))
+           (rubric-item 'type #f (format "Prerequisite: ~a" str))
            (weights (*) item ...))]))
   
 
@@ -390,7 +390,7 @@ validity, and test thoroughness results are reported. No grade information is re
   (syntax-case stx ()
     [(_ name fn item ...)
      #'(if (false? fn)
-           (rubric-item 'other 1 #f "couldn't find ~a handler function" 'name)
+           (rubric-item 'other #f "couldn't find ~a handler function" 'name)
            (recovery-point grade-bb-handler
              (assert-context--@problem)
              (parameterize ([context (cons (get-htdf* fn) (context))])
@@ -842,9 +842,10 @@ validity, and test thoroughness results are reported. No grade information is re
             "must have a single top-level expression following ~a definitions supplied in starter file" ndefns)
     (let ([sexp (last sexps)])
       (weights (*)
-        (rubric-item 'eval-etc 1 (andmap (lambda (s) (member s (free sexp))) must-use-free)
+        (rubric-item 'eval-etc 
+                     (andmap (lambda (s) (member s (free sexp))) must-use-free)
                      "Expression uses ~a supplied constant definitions" ndefns)
-        (rubric-item 'eval-etc 1
+        (rubric-item 'eval-etc
                      (calling-evaluator #f `(equal? ,sexp ,value-expr))
                      "Expression evaluates to ~s" (calling-evaluator #f value-expr))))))
 
@@ -860,7 +861,7 @@ validity, and test thoroughness results are reported. No grade information is re
                                                (foldr append '() (map calls2 local-defns))))])
 
     (if (or (not local-defns) (null? local-defns))
-        (rubric-item 'template-intact 1 #f "Local expression with functions present")
+        (rubric-item 'template-intact #f "Local expression with functions present")
         #;
         (score #t
                'template-intact 1
@@ -879,7 +880,7 @@ validity, and test thoroughness results are reported. No grade information is re
         (header "Tail recursive: "
                 (combine-scores
                  (weights* 1.0 '(1 *)
-                   (cons (rubric-item 'template-intact 1
+                   (cons (rubric-item 'template-intact
                                       (andmap (lambda (c) (eqv? (call-ctx c) 'tail)) local-calls)
                                       "All recursive or mutually recursive calls must be in tail position") 
                          (for/list ([c local-calls])
@@ -1052,11 +1053,11 @@ validity, and test thoroughness results are reported. No grade information is re
                 (let loop ([sub-args sub-args]
                            [sol-args sol-args])
                   (if (empty? sol-args)
-                      (list (rubric-item 'signature 1
+                      (list (rubric-item 'signature 
                                          (and (equal? sub-result sol-result)
                                               (equal? sub-fail?  sol-fail?))
                                          "result type"))
-                      (cons (rubric-item 'signature 1
+                      (cons (rubric-item 'signature 
                                          (and (pair? sub-args)
                                               (equal? (car sub-args) (car sol-args)))
                                          "argument type")
@@ -1192,16 +1193,7 @@ validity, and test thoroughness results are reported. No grade information is re
                                applied)))))]))
 
 
-;; (rubric-item (one-of 'signature 'test-validity ...)
-;;              <value-if-correct>
-;;              <correct?>
-;;              fmt-ctl
-;;              fmt-args...)
 
-(define (rubric-item topic value corr? fmt-ctl . fmt-args)
-  (if corr?
-      (score #f topic value value '() (list (message #f "~a: correct."   (apply format fmt-ctl fmt-args))))
-      (score #f topic value     0 '() (list (message #f "~a: incorrect." (apply format fmt-ctl fmt-args))))))
 
 
 

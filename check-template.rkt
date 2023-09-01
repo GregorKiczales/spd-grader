@@ -165,7 +165,7 @@
          (let* ([htdd      (car (context))]
                 [templates (htdd-templates htdd)])
            (cond [(<= (length templates) (sub1 n))
-                  (rubric-item 'dd-template 1 #f
+                  (rubric-item 'dd-template #f
                                "dd template: could not find ~a dd template function definition." (number->ordinal* n))]
                  [else
                   (let ([defn (list-ref templates (sub1 n))])
@@ -187,7 +187,6 @@
          [template  (and (pair? templates) (car templates))])
          
     (rubric-item 'template
-                 1
                  (and template (pair? (cadr template)) (eqv? (caadr template) 'define))
                  "Template appears inside @template")))
 
@@ -209,16 +208,16 @@
     (let* ([htdf      (car (context))]
            [templates (htdf-templates htdf)])
       (cond [(<= (length templates) (sub1 n))
-             (rubric-item 'template 1 #f
+             (rubric-item 'template #f
                           "template: could not find ~a template function definition wrapped in @template." (number->ordinal* n))]
             [else
              (let* ([template  (list-ref templates (sub1 n))]
                     [defn (template-defn template)])
                (cond [(> (length (cdadr defn)) (length params))
-                      (rubric-item 'template 1 #f
+                      (rubric-item 'template #f
                                    "template: ~a template has too many parameters" (number->ordinal* n))]
                      [(< (length (cdadr defn)) (length params))
-                      (rubric-item 'template 1 #f
+                      (rubric-item 'template #f
                                    "template: ~a template has too few parameters" (number->ordinal* n))]
                      [else
                       (check-template type defn)]))]))))
@@ -229,16 +228,16 @@
     (let* ([htdf      (car (context))]
            [templates (htdf-templates htdf)])
       (cond [(<= (length templates) (sub1 n))
-             (rubric-item 'template 1 #f
+             (rubric-item 'template #f
                           "template: could not find ~a template function definition wrapped in @template." (number->ordinal* n))]
             [else
              (let* ([template  (list-ref templates (sub1 n))]
                     [defn (template-defn template)])
                (cond [(> (length (cdadr defn)) (length params))
-                      (rubric-item 'template 1 #f
+                      (rubric-item 'template #f
                                    "template: ~a template has too many parameters" (number->ordinal* n))]
                      [(< (length (cdadr defn)) (length params))
-                      (rubric-item 'template 1 #f
+                      (rubric-item 'template #f
                                    "template: ~a template has too few parameters" (number->ordinal* n))]
                      [else
                       (check-template-intact defn `(define (,fn-for ,@params) ,body) "" "")]))]))))
@@ -249,19 +248,19 @@
     (let* ([htdf      (car (context))]
            [templates (htdf-templates htdf)])
       (cond [(<= (length templates) (sub1 n))
-             (rubric-item 'template 1 #f
+             (rubric-item 'template #f
                           "template: could not find ~a template function definition wrapped in @template." (number->ordinal* n))]
             [else
              (let* ([template  (list-ref templates (sub1 n))]
                     [defn (template-defn template)])
                (cond [(> (length (cdadr defn)) (length params))
-                      (rubric-item 'template 1 #f
+                      (rubric-item 'template #f
                                    "template: ~a template has too many parameters" (number->ordinal* n))]
                      [(< (length (cdadr defn)) (length params))
-                      (rubric-item 'template 1 #f
+                      (rubric-item 'template #f
                                    "template: ~a template has too few parameters" (number->ordinal* n))]
                      [else
-                      (rubric-item 'template 1
+                      (rubric-item 'template
                                    (equal? defn `(define (,fn-for ,@params) ,body))
                                    "template")]))]))))
 
@@ -319,7 +318,7 @@
   (let* ([defn    (list-ref (htdf-defns (car (context))) (sub1 n))]
          [fn-name (cdadr defn)]
          [not-rec? (not (recursive? defn))])
-    (rubric-item 'template 1 not-rec? "Must not use any part of a recursive template")))
+    (rubric-item 'template not-rec? "Must not use any part of a recursive template")))
 
 
 
@@ -417,13 +416,13 @@
     (let ([sub (peek)])
       (cond [(eqv? sub sol)
              (pop)
-             (set! scores (cons (rubric-item 'dd-rules 1 #t "~a" sol) scores))]
+             (set! scores (cons (rubric-item 'dd-rules #t "~a" sol) scores))]
             [allow-one-missing?
              (set! allow-one-missing? false)
-             (set! scores (cons (rubric-item 'dd-rules 1 #f "~a" sol) scores))]
+             (set! scores (cons (rubric-item 'dd-rules #f "~a" sol) scores))]
             [else
              (pop)
-             (set! scores (cons (rubric-item 'dd-rules 1 #f "~a" sol) scores))])))
+             (set! scores (cons (rubric-item 'dd-rules #f "~a" sol) scores))])))
           
   
   (define (check ty in-one-of? in-compound?)
@@ -463,7 +462,7 @@
   (for ([sub rules])
     (unless allow-one-missing?
       (set! scores
-            (cons (rubric-item 'dd-rules 1 #f "extra rule: ~a" sub)
+            (cons (rubric-item 'dd-rules #f "extra rule: ~a" sub)
                   scores)))
     (set! allow-one-missing? #f))
   
@@ -648,7 +647,7 @@
                 (andmap walk sub sol))]))
 
 
-  (rubric-item 'template-intact 1
+  (rubric-item 'template-intact
                (with-handlers ([void (lambda (e) #f)])
                  (walk (caddr sub0) (caddr sol0)))
                "~a~a~a"
