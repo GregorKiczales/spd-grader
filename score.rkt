@@ -53,16 +53,10 @@
 (define (score-it topic w m v? fmt-ctl . fmt-args)
   (score #f topic w m '() (list (msg v? (apply format fmt-ctl fmt-args)))))
 
-;(define (rubric-item . args)
-;  ;; the new one doesn't take weight
-  (define (rubric-item topic correct? fmt-ctl . fmt-args)
-    (if correct?
+(define (rubric-item topic correct? fmt-ctl . fmt-args)
+  (if correct?
       (score #f topic 1 1 '() (list (message #f "~a: correct."   (apply format fmt-ctl fmt-args))))
       (score #f topic 1 0 '() (list (message #f "~a: incorrect." (apply format fmt-ctl fmt-args))))))
-;
-;  (if (number? (cadr args))
-;      (apply rubric-item (cons (car args) (cddr args)))
-;      (apply rubric-item args)))
 
 
 

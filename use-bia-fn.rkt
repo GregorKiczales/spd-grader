@@ -195,7 +195,10 @@ NOTE: This problem will be autograded, and ALL OF THE FOLLOWING ARE ESSENTIAL
 (define (match-abs-compositions? sol sub)
   (cond [(and (null? sol) (null? sub)) #t]
         [(or  (null? sol) (null? sub)) #f]
-        [(symbol? sol) (or (eqv? sol '_) (eqv? sol sub))]
+        [(symbol? sol) (or (eqv? sol '_)
+                           (eqv? sol sub)
+                           (and (eqv? sol 'fold*)
+                                (memq sub '(foldr foldl))))]
         [(symbol? sub) #f]
         [else
          (and (match-abs-compositions? (car sol) (car sub))
@@ -363,6 +366,16 @@ NOTE: This problem will be autograded, and ALL OF THE FOLLOWING ARE ESSENTIAL
                                              (map (lambda (lon)
                                                     (foldr max 0 lon))
                                                   lolon)))))
+  
+  (check-true  (match-abs-compositions?
+               '(fold* _ _)
+               (infer-bia-fn-composition #'(define (largest lon)
+                                             (foldr max 0 lon)))))
+  
+  (check-true  (match-abs-compositions?
+               '(fold* _ _)
+               (infer-bia-fn-composition #'(define (largest lon)
+                                             (foldl max 0 lon)))))
 
 
   
