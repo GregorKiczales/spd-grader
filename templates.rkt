@@ -107,9 +107,9 @@ Standard directions are:
                                                  (and fn-name
                                                       (filled? fn-name)
                                                       (let [(cond-expr (get-cond fn-name))]
-                                                        (list? cond-expr)
-                                                        (equal? (map car (cdr cond-expr))
-                                                                (map car '(qa-pair ...)))))
+                                                        (and (list? cond-expr)
+                                                             (equal? (map car (cdr cond-expr))
+                                                                     (map car '(qa-pair ...))))))
                                                  what)))]))
 
 (define-syntax (grade-prohibited-calls stx)
@@ -137,7 +137,7 @@ Standard directions are:
 (define (calls-all? defn names)
   (andmap (lambda (name) (calls? defn name)) names))
 
-(define (get-cond defn) ;!!! make this work in presence of try-catch
+(define (get-cond defn) ;!!! make this work in presence of try-catch, and accumulator
   (and (pair? defn)
        (= (length defn) 3)
        (pair? (caddr defn))
