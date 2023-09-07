@@ -138,7 +138,7 @@ NOTE: This problem will be autograded, and ALL OF THE FOLLOWING ARE ESSENTIAL
     (ensure (= (length defns) 1)          "must define single top-level function")
     (ensure (not (recursive? defn))       "must not be recursive")
     (ensure (not (empty? called-bia-fns)) "must call one or more built-in abstract functions")
-    
+
     (let* ([comp (infer-bia-fn-composition (datum->syntax #f defn) all-bia-fns)]
            [entry                     (lookup comp max-marks-and-comps)]
            [entry-is-best?            (and entry (equal? entry (first max-marks-and-comps)))]
@@ -313,8 +313,16 @@ NOTE: This problem will be autograded, and ALL OF THE FOLLOWING ARE ESSENTIAL
 
 (define (compose-abs-fn-result biafn arg-types)
   (case biafn
-    [(foldr foldl) `(,biafn ,(car arg-types) ,(caddr arg-types))] ;!!! is this really worth it?
-    [else          `(,biafn ,@arg-types)]))
+    [(foldr foldl)
+     (if (not (= (length arg-types) 3))
+         `(,biafn any any)
+         `(,biafn ,(car arg-types) ,(caddr arg-types)))] ;!!! is it worth it to drop type of base arg?
+    [(map andmap ormap build-list)
+     (if (not (= (length arg-types) 2))
+         `(,biafn any any)
+         `(,biafn ,@arg-types))]
+    [else
+     `(,biafn ,@arg-types)]))
 
 
 (module+ test
@@ -489,6 +497,12 @@ NOTE: This problem will be autograded, and ALL OF THE FOLLOWING ARE ESSENTIAL
   (check-equal? (infer-bia-fn-composition #'(define (explode-pyramid s)
                                               (local [(define (grow n) (build-list (add1 n) (λ (x) (string-ith s x))))]
                                                 (build-list (string-length s) grow))))
+                '(build-list any (build-list any any)))
+
+  (check-equal? (infer-bia-fn-composition #'(define(funny lon str)
+                                              (local [(define (lon->los lon)
+                                                        (foldr (lambda (n str) (xxx (number->string n) n) ) lon))]
+                                                (lon->los lon))))
                 '(build-list any (build-list any any)))
 
 
