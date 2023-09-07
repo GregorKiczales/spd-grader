@@ -1,14 +1,15 @@
 #lang racket
 
-(require racket/function
-         racket/pretty
-         racket/sandbox
-         syntax/stx
+(require racket/bool
+         racket/function
+         racket/list
+         racket/sequence
+         racket/string
          "defs.rkt"
-         "utils.rkt"
-         "score.rkt"
          "reloadable.rkt"
          "sandbox.rkt"
+         "score.rkt"
+         "utils.rkt"
          "walker.rkt")
 
 (provide (all-defined-out)
