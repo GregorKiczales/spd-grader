@@ -841,11 +841,17 @@ validity, and test thoroughness results are reported. No grade information is re
             "must not comment out or edit ~a definitions supplied in starter file" ndefns)
     (ensure (= (length sexps) (add1 ndefns))
             "must have a single top-level expression following ~a definitions supplied in starter file" ndefns)
-    (let ([sexp (last sexps)])
+    (let* ([sexp (last sexps)]
+           [uses-free     (free sexp)]
+           [uses-constant (constants sexp)]
+           [permitted-constants (constants value-expr)])
       (weights (*)
         (rubric-item 'eval-etc 
-                     (andmap (lambda (s) (member s (free sexp))) must-use-free)
-                     "Expression uses ~a supplied constant definitions" ndefns)
+                     (andmap (lambda (s) (member s uses-free)) must-use-free)
+                     "Expression uses required CONSTANT definitions")
+        (rubric-item 'eval-etc 
+                     (andmap (lambda (s) (member s permitted-constants)) uses-constant)
+                     "Expression uses inappropriate inline value")
         (rubric-item 'eval-etc
                      (calling-evaluator #f `(equal? ,sexp ,value-expr))
                      "Expression evaluates to ~s" (calling-evaluator #f value-expr))))))
