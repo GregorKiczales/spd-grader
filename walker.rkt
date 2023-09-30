@@ -1,5 +1,7 @@
 #lang racket
 
+(require racket/list)
+
 (module+ test
   (require rackunit))
 
@@ -263,6 +265,27 @@
                               in-fn-defn)
                         (recur))]
                  [(if cond and or define local local-define local-body lambda #;call) (recur)]))))
+
+(define (calls?  f0 name)
+  (calls-all? f0 (list name)))
+
+(define (calls-all?  f0 names)
+  (let/cc return 
+    (walk-form (datum->syntax #f f0)
+               '()
+               (lambda (kind stx e ctx env in-fn-defn recur)
+                 (walker-case kind
+                   [(value constant null bound free) '()]
+                   [(call)
+                    (let ([name (syntax->datum (car e))])
+                      (if (memq name names)
+                          (begin (set! names (remove name names))
+                                 (if (null? names)
+                                     (return #t)
+                                     (recur)))
+                          (recur)))]
+                   [(if cond and or define local local-define local-body lambda #;call) (recur)])))
+    #f))
 
 ;; 
 ;; should be called on top-level define

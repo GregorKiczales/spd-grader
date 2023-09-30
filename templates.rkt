@@ -50,7 +50,7 @@ Standard directions are:
      #'(let ([what (format "~a - natural recursion intact" 'fn-name)])
          (guard-template-fn-grading fn-name 'template-intact what
                                     (rubric-item 'template-intact
-                                                 (calls? fn-name 'fn-name)
+                                                 (filled-and-calls? fn-name 'fn-name)
                                                  what)))]))
 
 (define-syntax (grade-mr-intact stx)
@@ -61,7 +61,7 @@ Standard directions are:
                            (if (null? (cdr '(called-fn ...))) "" "s"))])
          (guard-template-fn-grading fn-name 'template-intact what
                                     (rubric-item 'template-intact
-                                                 (calls-all? fn-name '(called-fn ...))
+                                                 (filled-and-calls-all? fn-name '(called-fn ...))
                                                  what)))]))
 
 (define-syntax (grade-nh-intact stx)
@@ -119,7 +119,7 @@ Standard directions are:
          (guard-template-fn-grading fn-name 'template-intact what
                                     (rubric-item 'template-intact
                                                  (and (filled? fn-name)
-                                                      (not (ormap (lambda (bad) (calls? fn-name bad)) 'bad-fns-to-call)))
+                                                      (not (ormap (lambda (bad) (filled-and-calls? fn-name bad)) 'bad-fns-to-call)))
                                                  what)))]))
 
 
@@ -127,15 +127,15 @@ Standard directions are:
 (define (find-defn name defns)
   (findf (lambda (defn) (eqv? (caadr defn) name)) defns))
 
-;; !!! move this to walker and make it call walk- directly so it produces true as soon as it finds name
-(define (calls? defn name)
+(define (filled-and-calls? defn name)
   (and defn
        (filled? defn)
-       (member name (called-fn-names defn))))
+       (calls? defn name)))
 
-;; !!! ditto
-(define (calls-all? defn names)
-  (andmap (lambda (name) (calls? defn name)) names))
+(define (filled-and-calls-all? defn names)
+  (and defn
+       (filled? defn)
+       (calls-all? defn names)))
 
 (define (get-cond defn) ;!!! make this work in presence of try-catch, and accumulator
   (and (pair? defn)
