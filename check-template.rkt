@@ -394,7 +394,7 @@
                         (check sol (cdr sub)))]
                  ;; after those special cases it's just incorrect
                  [else
-                  (cons (tally #f "~a is incorrect." (car sol))
+                  (cons (tally #f "~a is incorrect." (car sub))
                         (check (cdr sol) (cdr sub)))])]))
 
   (define (tally corr? fmt . fmt-args)
@@ -492,8 +492,9 @@
           [(distinct? ty) (tally (equal? expr '(...))            "~aatomic distinct ~a"     prefix expr)]
 	  [(one-of?   ty) (check-one-of   ty expr prefix)]
 	  [(compound? ty) (check-compound ty expr prefix)]
-          ;[(self-ref? ty) (check-self-ref ty expr)]
-          ;[(ref?      ty) (check-self-ref ty expr)]
+          ;; these can only be inside a compound
+          ;; [(self-ref? ty) ...]
+          ;; [(ref?      ty) ...]
 	  [else
 	   (error "unrecognized type ~a" ty)]))
   
