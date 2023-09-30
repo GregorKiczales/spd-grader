@@ -54,14 +54,17 @@ NOTE: This problem will be autograded, and ALL OF THE FOLLOWING ARE ESSENTIAL
  - The function definition and any helper functions you design MUST NOT be
    recursive.
 
- - The result of the function must directly be the result of one of the
-   built-in abstract functions. So, for example, the following would not
-   be a valid function body:
+ - The result of the function and any helper functions you design must
+   directly be the result of one of the built-in abstract functions. So, 
+   for example, the following would not be a valid function for your main
+   function or any helper functions. That's because the result of filter
+   is not the result of foo.
 
        (define (foo x)
          (empty? (filter ...)))
 
-   This would be a valid function body:
+   This would be a valid function body because the result of foo is the
+   result of helper, which is the result of foldr.
 
        (define (foo x)
          (local [(define (helper y) (foldr ... ... ...))]
