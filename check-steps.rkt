@@ -60,9 +60,9 @@
           ;; correct     is correct marks
           ;; msgs        is (listof Message) describing each step
           ;; n           is the step number in sub
-          (let loop ([sub      (drop sub ndefs)]
-                     [sol      sol]
-                     [possible (length sol)]
+          (let loop ([sub      (cdr (drop sub ndefs))] ;starting expr doesn't count
+                     [sol      (cdr sol)]              ;
+                     [possible (sub1 (length sol))]    ;
                      [correct  0]
                      [msgs     '()]
                      [n        1])
