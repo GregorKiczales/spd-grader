@@ -183,8 +183,9 @@
            (find-grader filename))])
     (autograde-file-with-grader filename grader verb? earl? rpt logr)))
 
-(define (autograde-file-with-grader filename grader [verb? #t] [earl? #f] [rpt (current-output-port)] [logr displayln])
-  ;; until we get going any error is a grader framework error and we just log it		
+(define (autograde-file-with-grader filename grader [verb? #t] [earl? #f] [rpt (current-output-port)] [logr displayln])               
+  ;; until we get going any error is a grader framework error and we just log it
+  (logr (format "~a has grader" filename));if the semaphores in find-grader hang we wouldn't get here!!!
   (with-handlers ([exn:fail?
                    (lambda (exn)
                      (logr (format "Error: framework error for submission ~a - ~a"
