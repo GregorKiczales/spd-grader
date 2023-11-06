@@ -287,6 +287,21 @@
                    [(if cond and or define local local-define local-body lambda #;call) (recur)])))
     #f))
 
+(define (calls-none?  f0 names)
+  (let/cc return 
+    (walk-form (datum->syntax #f f0)
+               '()
+               (lambda (kind stx e ctx env in-fn-defn recur)
+                 (walker-case kind
+                   [(value constant null bound free) '()]
+                   [(call)
+                    (let ([name (syntax->datum (car e))])
+                      (if (memq name names)
+                          (return #f)
+                          (recur)))]
+                   [(if cond and or define local local-define local-body lambda #;call) (recur)])))
+    #t))
+
 ;; 
 ;; should be called on top-level define
 ;; doesn't get cycles involving first-class functions
@@ -465,9 +480,8 @@
               (list? (cadr q))            ;(false? x)
               (= (length (cadr q)) 2)
               (eqv? (caadr q) 'false?)
-              (let ([x (cadadr q)])
-                (equal? x a))))))
-
+              (contains-exp? (cadadr q) a)))))
+  
 
 
 ;; sexp? -> boolean?
