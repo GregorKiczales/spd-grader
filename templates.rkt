@@ -78,7 +78,7 @@ Standard directions are:
 (define-syntax (grade-try-catch stx)
   (syntax-case stx ()
     [(_ fn-name)
-     #'(let ([what (format  "~a - no try-catch blended in" 'fn-name)])
+     #'(let ([what (format  "~a - try-catch blended in" 'fn-name)])
          (guard-template-fn-grading fn-name 'template-intact what
                                     (rubric-item 'template-intact
                                                  (and fn-name
@@ -90,7 +90,7 @@ Standard directions are:
 (define-syntax (grade-no-try-catch stx)
   (syntax-case stx ()
     [(_ fn-name)
-     #'(let ([what (format  "~a - try-catch blended in" 'fn-name)])
+     #'(let ([what (format  "~a - no try-catch blended in" 'fn-name)])
          (guard-template-fn-grading fn-name 'template-intact what
                                     (rubric-item 'template-intact
                                                  (and fn-name
