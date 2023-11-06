@@ -147,7 +147,10 @@ NOTE: This problem will be autograded, and ALL OF THE FOLLOWING ARE ESSENTIAL
            [entry-is-best?            (and entry (equal? entry (first max-marks-and-comps)))]
            [ti-score                  (if entry (car entry) 0)]
            [ti-score-reduction-string (and entry (~r (* 100 (- 1 (car entry))) #:precision 1 #:notation 'positional))]
-           [best-is-comp?             (not (equal? (cdadar max-marks-and-comps) '(_ _)))]
+           [data-arg                  (if (eqv? (caadar max-marks-and-comps) 'build-list)
+                                          (cadr  (cadar max-marks-and-comps))
+                                          (caddr (cadar max-marks-and-comps)))]
+           [best-is-comp?             (not (eq? data-arg '_))]
            [to-score
             (cond [(not (pair? to-tag)) 0]
                   [best-is-comp?
