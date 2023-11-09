@@ -153,6 +153,8 @@ NOTE: This problem will be autograded, and ALL OF THE FOLLOWING ARE ESSENTIAL
            [best-is-comp?             (not (eq? data-arg '_))]
            [to-score
             (cond [(not (pair? to-tag)) 0]
+                  ;; for now ignore fn-composition 
+                  #;
                   [best-is-comp?
                    (+ (if (member 'fn-composition  to-tag) .5 0)
                       (if (member 'use-abstract-fn to-tag) .5 0))]
