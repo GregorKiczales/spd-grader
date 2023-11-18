@@ -185,7 +185,7 @@
 
 (define (autograde-file-with-grader filename grader [verb? #t] [earl? #f] [rpt (current-output-port)] [logr displayln])               
   ;; until we get going any error is a grader framework error and we just log it
-  (logr (format "~a has grader" filename));if the semaphores in find-grader hang we wouldn't get here!!!
+ ;(logr (format "~a has grader" filename));if the semaphores in find-grader hang we wouldn't get here!!!
   (with-handlers ([exn:fail?
                    (lambda (exn)
                      (logr (format "Error: framework error for submission ~a - ~a"
@@ -1348,7 +1348,7 @@ validity, and test thoroughness results are reported. No grade information is re
 
 (define (require?              x) (and (pair? x) (eq?   (car x) 'require)))
 (define (check?                x) (and (pair? x) (member (car x) CHECK-FORMS)))
-(define (fn-defn?              x) (and (pair? x) (eq? (car x) 'define) (pair? (cadr x))))
+(define (fn-defn?              x) (and (pair? x) (eq? (car x) 'define) (pair? (cadr x)) (pair? (cddr x))))
 (define (const-defn?           x) (and (pair? x) (eq? (car x) 'define) (symbol? (cadr x))))
 (define (struct-defn?          x) (and (pair? x) (eq? (car x) 'define-struct)))
 (define (defn?                 x) (or (fn-defn? x) (const-defn? x) (struct-defn? x)))
