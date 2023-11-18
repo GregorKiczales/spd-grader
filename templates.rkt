@@ -24,13 +24,13 @@ Standard directions are:
     [(_ (fn-name ...) body-expr ...)
      #'(let* ([defns (htdf-defns (car (context)))]
               [defn  (and (pair? defns) (car defns))]
-              [body  (and (list? defn) (= (length defn) 3) (caddr defn))]
+              [body  (and (fn-defn? defn) (caddr defn))]
               
-              [local-defns (and (list? body) (= (length body) 3) (eqv? (car body) 'local) (cadr body))]
+              [local-defns    (and (list? body) (= (length body) 3) (eqv? (car body) 'local) (cadr body))]
                  
-              [all-locals? (= (length local-defns) (length '(fn-name ...)))] ;!!!
+              [enough-locals? (and local-defns (= (length local-defns) (length '(fn-name ...))))]
 
-              [fn-name (find-defn 'fn-name local-defns)] ...)
+              [fn-name        (and enough-locals? (find-defn 'fn-name local-defns))] ...)
          body-expr ...)]))
 
 (define-syntax (guard-template-fn-grading stx)
