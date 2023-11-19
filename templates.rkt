@@ -27,7 +27,7 @@ Standard directions are:
                      [defn  (and (pair? defns) (car defns))]
                      [body  (and (fn-defn? defn) (caddr defn))]                     
                      [local-defns    (and (list? body) (= (length body) 3) (eqv? (car body) 'local) (cadr body))]                     
-                     [enough-locals? (and local-defns (= (length local-defns) (length '(fn-name ...))))]
+                     [enough-locals? (and local-defns (>= (length local-defns) (length '(fn-name ...))))]
                      
                      [fn-name        (and enough-locals? (find-defn 'fn-name local-defns))] ...)
          body-expr ...)])))
@@ -124,15 +124,20 @@ Standard directions are:
 
 
 (define (find-defn name defns)
-  (findf (lambda (defn) (eqv? (caadr defn) name)) defns))
+  (findf (lambda (defn)
+           (and (fn-defn? defn)
+                (eqv? (caadr defn) name)))
+         defns))
 
 (define (filled-and-calls? defn name)
   (and defn
+       (fn-defn? defn)
        (filled? defn)
        (calls? defn name)))
 
 (define (filled-and-calls-all? defn names)
   (and defn
+       (fn-defn? defn)
        (filled? defn)
        (calls-all? defn names)))
 
