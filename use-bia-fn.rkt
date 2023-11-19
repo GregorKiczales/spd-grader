@@ -316,8 +316,10 @@ NOTE: This problem will be autograded, and ALL OF THE FOLLOWING ARE ESSENTIAL
                                     p)])
                     (hash-set! fn-types called-fn-defn result-type)
                     result-type))]))]))
-  
-  (car (walk-form stx0 '() p append)))
+
+  (with-handlers ([exn:fail?
+                   (lambda (e) '())])
+    (car (walk-form stx0 '() p append))))
 
 (define (compose-abs-fn-result biafn arg-types)
   (case biafn
