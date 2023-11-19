@@ -30,7 +30,7 @@ Standard directions are:
                      [enough-locals? (and local-defns (>= (length local-defns) (length '(fn-name ...))))]
                      
                      [fn-name        (and enough-locals? (find-defn 'fn-name local-defns))] ...)
-         body-expr ...)])))
+         body-expr ...))]))
 
 (define-syntax (guard-template-fn-grading stx)
   (syntax-case stx ()
