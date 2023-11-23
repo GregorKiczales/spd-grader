@@ -8,6 +8,7 @@
          grade-nr-intact grade-mr-intact grade-nh-intact
          grade-try-catch grade-no-try-catch
          grade-questions-intact
+         grade-accumulator-intact
          grade-prohibited-calls)
 
 
@@ -30,7 +31,7 @@ Standard directions are:
                      [enough-locals? (and local-defns (>= (length local-defns) (length '(fn-name ...))))]
                      
                      [fn-name        (and enough-locals? (find-defn 'fn-name local-defns))] ...)
-         body-expr ...))]))
+                body-expr ...))]))
 
 (define-syntax (guard-template-fn-grading stx)
   (syntax-case stx ()
@@ -46,10 +47,12 @@ Standard directions are:
 (define-syntax (grade-nr-intact stx)
   (syntax-case stx ()
     [(_ fn-name)
+     #'(grade-nr-intact fn-name 1)]
+    [(_ fn-name n)
      #'(let ([what (format "~a - natural recursion intact" 'fn-name)])
          (guard-template-fn-grading fn-name 'template-intact what
                                     (rubric-item 'template-intact
-                                                 (filled-and-calls? fn-name 'fn-name)
+                                                 (filled-and-calls? fn-name 'fn-name n)
                                                  what)))]))
 
 (define-syntax (grade-mr-intact stx)
@@ -111,6 +114,27 @@ Standard directions are:
                                                                      (map car '(qa-pair ...))))))
                                                  what)))]))
 
+
+(define-syntax (grade-accumulator-intact stx)
+  (syntax-case stx ()
+    [(_ fn-name naccs)
+     #`(begin (assert-context--@htdf)
+              (let* ([defns (htdf-defns (car (context)))]
+                     
+                     [defn  (and (pair? defns) (car defns))]
+                     [top-level-params (and (pair? defns) (cdadr defn))]
+                     [body  (and (fn-defn? defn) (caddr defn))]
+                     
+                     [local-defns    (and (list? body) (= (length body) 3) (eqv? (car body) 'local) (cadr body))]
+                                          
+                     [local-params (map (lambda (defn) (cdadr defn)) local-defns)])
+
+                (rubric-item 'template-intact
+                             (and (pair? local-params)
+                                  (= (- (length (car local-params)) (length top-level-params)) naccs))
+                             "accumulator template with ~a accumulators intact"
+                             naccs)))]))
+
 (define-syntax (grade-prohibited-calls stx)
   (syntax-case stx ()
     [(_ fn-name bad-fns-to-call)
@@ -129,11 +153,13 @@ Standard directions are:
                 (eqv? (caadr defn) name)))
          defns))
 
-(define (filled-and-calls? defn name)
+(define (filled-and-calls? defn name [n 1])
   (and defn
        (fn-defn? defn)
        (filled? defn)
-       (calls? defn name)))
+       (if (= n 1)
+           (calls? defn name)
+           (= (ncalls defn name) n))))
 
 (define (filled-and-calls-all? defn names)
   (and defn
