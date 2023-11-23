@@ -43,12 +43,12 @@
 
 (define-syntax (walker-case stx) ;used in grade-problem 
   (syntax-case stx ()
-    [(_ expr [(k ...) result] ...)
+    [(_ expr [(k ...) result ...] ...)
      (let ([kinds-used (foldr append '() (map car (cddr (syntax->datum stx))))])
        (and (andmap (lambda (used) (member used KINDS)) kinds-used)
             (andmap (lambda (kind) (member kind kinds-used)) KINDS)))
      #'(case expr
-         [(k ...) result]
+         [(k ...) result ...]
          ...)]))
 
 ;; note that p cannot change during the walk
@@ -301,6 +301,20 @@
                           (recur)))]
                    [(if cond and or define local local-define local-body lambda #;call) (recur)])))
     #t))
+
+(define (ncalls  f0 name)
+  (let ([n 0])
+    (walk-form (datum->syntax #f f0)
+               '()
+               (lambda (kind stx e ctx env in-fn-defn recur)
+                 (walker-case kind
+                   [(value constant null bound free) '()]
+                   [(call)
+                    (when (eq? (syntax->datum (car e)) name)
+                      (set! n (add1 n)))
+                    (recur)]
+                   [(if cond and or define local local-define local-body lambda #;call) (recur)])))
+    n))
 
 ;; 
 ;; should be called on top-level define
