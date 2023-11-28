@@ -126,8 +126,9 @@ Standard directions are:
                      [body  (and (fn-defn? defn) (caddr defn))]
                      
                      [local-defns    (and (list? body) (= (length body) 3) (eqv? (car body) 'local) (cadr body))]
+                     [local-fn-defns (filter fn-defn? local-defns)]
                                           
-                     [local-params (map (lambda (defn) (cdadr defn)) local-defns)])
+                     [local-params (map (lambda (defn) (cdadr defn)) local-fn-defns)])
 
                 (rubric-item 'template-intact
                              (and (pair? local-params)
