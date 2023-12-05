@@ -142,15 +142,19 @@
              (let loop ([sol-sexps sol-sexps]
                         [sig? #f]
                         [ces? #f]
+                        [tos? #f]
                         [others? #f])
                (if (null? sol-sexps)
-                   (cond [others?         "must not edit elements of starter file that instructions say not to change"]
-                         [(and sig? ces?) "must not edit signature or tests in starter file"]
-                         [sig?            "must not edit signature in starter file"]
-                         [ces?            "must not edit tests in starter-file"])
-                   (cond [(@signature? (car sol-sexps)) (loop (rest sol-sexps) #t   ces? others?)]
-                         [(check?      (car sol-sexps)) (loop (rest sol-sexps) sig? #t   others?)]
-                         [else                          (loop (rest sol-sexps) sig? ces? #t)]))))])
+                   (cond [others?              "must not edit elements of starter file that instructions say not to change"]
+                         [(and sig? ces? tos?) "must not edit signature, tests or template-origin in starter file"]
+                         [(and sig? ces?)      "must not edit signature or tests in starter file"]
+                         [sig?                 "must not edit signature in starter file"]
+                         [ces?                 "must not edit tests in starter-file"]
+                         [tos?                 "must not edit template-origins in starter-file"])
+                   (cond [(@signature?       (car sol-sexps)) (loop (rest sol-sexps) #t   ces? tos? others?)]
+                         [(check?            (car sol-sexps)) (loop (rest sol-sexps) sig? #t   tos? others?)]
+                         [(@template-origin? (car sol-sexps)) (loop (rest sol-sexps) sig? #t   #t   others?)]
+                         [else                                (loop (rest sol-sexps) sig? ces? tos? #t)]))))])
     
     (ensure (unchanged? sol-sexps sub-sexps) msg)))
 
