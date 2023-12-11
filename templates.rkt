@@ -117,24 +117,65 @@ Standard directions are:
 
 (define-syntax (grade-accumulator-intact stx)
   (syntax-case stx ()
-    [(_ fn-name naccs)
+    [(_ fn-name (local-fn-name ...) min-accs max-accs)
      #`(begin (assert-context--@htdf)
               (let* ([defns (htdf-defns (car (context)))]
                      
-                     [defn  (and (pair? defns) (car defns))]
-                     [top-level-params (and (pair? defns) (cdadr defn))]
-                     [body  (and (fn-defn? defn) (caddr defn))]
-                     
-                     [local-defns    (and (list? body) (= (length body) 3) (eqv? (car body) 'local) (cadr body))]
-                     [local-fn-defns (filter fn-defn? local-defns)]
-                                          
-                     [local-params (map (lambda (defn) (cdadr defn)) local-fn-defns)])
+                     [defn  (and (pair? defns) (car defns))])
+                (check-accumulator-intact defn '(local-fn-name ...) min-accs max-accs)))]))
 
-                (rubric-item 'template-intact
-                             (and (pair? local-params)
-                                  (= (- (length (car local-params)) (length top-level-params)) naccs))
-                             "accumulator template with ~a accumulators intact"
-                             naccs)))]))
+
+(define (check-accumulator-intact defn local-fn-names min-accs max-accs)
+  
+  
+  (let* ([top-level-params   (and (fn-defn? defn) (cdadr defn))]
+         [body               (and (fn-defn? defn) (caddr defn))]
+         [all-local-fn-defns (and (list? body)
+                                  (= (length body) 3)
+                                  (eqv? (car body) 'local)
+                                  (filter fn-defn? (cadr body)))]
+         
+         [local-fn-defns   (for/list ([name local-fn-names]
+                                      [i (in-naturals)])
+                             (if (eqv? name '*)
+                                 (list-ref all-local-fn-defns i)
+                                 (findf (lambda (defn)
+                                          (eqv? (caadr defn) name))
+                                        all-local-fn-defns)))]
+         [local-params (map (lambda (defn) (cdadr defn)) local-fn-defns)]
+
+         [a-params
+          (cond [(= min-accs max-accs 1)       "last parameter"]
+                [(= min-accs max-accs)         (format "last ~a parameters" min-accs)]
+                [else                          (format "between ~a and ~a last parameters" min-accs max-accs)])]
+         [a-fns
+          (cond [(= (length local-fn-names) 1) "local function"]
+                [else                          (format "~a local functions" (length local-fn-names))])])
+
+    (define (ri x)
+      (rubric-item 'template-intact (not (false? x))
+                   "accumulator template intact - ~a of ~a are the same"
+                   a-params a-fns))
+    
+    (weights (.4 *)
+      (rubric-item 'template-intact (pair? local-fn-defns)
+                   "accumulator template intact - top-level function definition around local function definition")
+      (let loop
+          ([n max-accs])
+        (cond [(< n min-accs)                (ri false)]
+              [(tails-equal? n local-params) (ri n)]
+              [else
+               (loop (sub1 n))])))))
+
+(define (tails-equal? n lolox)
+
+  
+  (define (tail lox) (and (>= (length lox) n) (take-right lox n)))
+  
+  (let ([tail0 (tail (first lolox))])
+    (andmap (lambda (loxn)
+              (equal? (tail loxn) tail0))
+            (rest lolox))))
 
 (define-syntax (grade-prohibited-calls stx)
   (syntax-case stx ()
