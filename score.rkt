@@ -8,13 +8,16 @@
          score-m        ;only score selector exported
          message
          score-it
-         rubric-item 
+         rubric-item
+         
+         reduce-it
+         
          header
          combine-scores
          weights
          weights+
          weights*
-         total-marks
+        ;total-marks
          score-max
          score-min
          score-*
@@ -32,6 +35,8 @@
 ;;        (list-of Message))
 
 (struct score (header? topic w m subs msgs) #:transparent #:name %score #:constructor-name %score)
+
+(struct reduction (topic w correct? msg) #:transparent)
 
 ;; !!! temporary backward compatibility for old arguments
 (define (score . args)
@@ -58,21 +63,80 @@
       (score #f topic 1 1 '() (list (message #f "~a: correct."   (apply format fmt-ctl fmt-args))))
       (score #f topic 1 0 '() (list (message #f "~a: incorrect." (apply format fmt-ctl fmt-args))))))
 
+(define (reduce-it topic w correct? fmt-ctl . fmt-args)
+  (if correct?
+      (reduction topic w correct? (message #f "Reduction not applied: ~a." (apply format fmt-ctl fmt-args)))    ;display-score hides these
+      (reduction topic w correct? (message #f "Reduction: ~a."             (apply format fmt-ctl fmt-args)))))
 
 
 (define (header text s)
   (score #t 'other (score-w s) (score-m s) (score-subs s) (list (message #f text))))
 
 
-(define (combine-scores scores)
-  (let ([scores (filter score? scores)]);remove null-scores ;!!! not used?
-    (score #f 1 (total-marks scores) scores '())))
-
-
 (define-syntax (weights stx)
   (syntax-case stx (*)
     [(_ (w ... *) s ...) #`(combine-scores (weights* 1.00 '#,(parse-weights stx #'(w ... *)) (list s ...)))]
     [(_ (w ...  ) s ...) #`(combine-scores (weights* 1.00 '#,(parse-weights stx #'(w ... ))  (list s ...)))]))
+
+(define-syntax (weights+ stx)
+  (syntax-case stx ()
+    [(_ . exprs)
+     (let* ([stxs (syntax-e #'exprs)]
+            [es (map syntax-e stxs)])
+       (check-well-formed-weights+ stx stxs)
+       #`(weights #,(map car es)
+           #,@(map cadr es)))]))
+
+(define (weights* left low los)
+  (let loop ([left left] [low low] [los los]) ;!!!(filter score? los)])
+    (cond [(and (empty? low) (empty? los)) '()]
+          [(empty? low) (error 'weights/weights* "More scores than weights and weights does not end with *.")]
+          [(empty? los) (error 'weights/weights* "More weights than scores.")]
+          [(eqv? (car low) '*) (map (curry weight (/ left (length los))) los)]
+          [else
+           (cond [(score? (car los))
+                  (cons (weight (car low) (car los))
+                        (loop (- left (car low))
+                              (cdr low)
+                              (cdr los)))]
+                 [(reduction? (car los))
+                  (cons (car los)
+                        (loop left low (cdr los)))])])))
+
+(define (weight n item)
+  (struct-copy %score item [w n]))
+
+
+(define (combine-scores all)
+  (let* ([scores                 (filter score? all)]
+         [reductions             (filter reduction? all)]
+         [applied-reductions     (filter (lambda (r) (not (reduction-correct? r))) reductions)]
+         
+         [score-total-weight     (foldl + 0 (map score-w     scores))]
+         [reduction-total-weight (foldl + 0 (map reduction-w reductions))])
+    
+    (unless (= (round* score-total-weight 2) 1)
+      (error (format "Scores do not total to a weight of 1. (Totals to ~a.)" score-total-weight)))
+    (unless (<= (round* reduction-total-weight 2) 1)
+      (error (format "Reductions total to more than 1. (Total to ~a.)" reduction-total-weight)))
+
+    (score #f 1
+           (round* (- (foldl + 0 (map * (map score-w scores) (map score-m scores)))
+                      (foldl + 0 (map reduction-w applied-reductions)))
+                   2)
+           all
+;           (map (lambda (x)
+;                  (cond [(score? x) x]
+;                        [(reduction? x)
+;                         (score #t (reduction-topic x) (reduction-w x) 0 '() (list (reduction-msg x)))]))
+;           (filter (lambda (x)
+;                     (not (and (reduction?
+;                          (or (score? x)
+;                             (and (reduction? x) (reduction-applied? x))))
+;                        all))
+           '())))
+
+
 
 (define-for-syntax (parse-weights stx los)
   ;; los is #'(list Num | * | (@ Natural Num))
@@ -97,17 +161,6 @@
                 [else
                  (raise-syntax-error #f "Expecting a percentage weight, (@ Natural <weight>), or *." stx s)])))))
 
-  
-
-(define-syntax (weights+ stx)
-  (syntax-case stx ()
-    [(_ . exprs)
-     (let* ([stxs (syntax-e #'exprs)]
-            [es (map syntax-e stxs)])
-       (check-well-formed-weights+ stx stxs)
-       #`(weights #,(map car es)
-                  #,@(map cadr es)))]))
-
 (define-for-syntax (check-well-formed-weights+ stx stxs)
   (let loop ([stxs stxs])
     (or (null? stxs)
@@ -123,32 +176,6 @@
                      (raise-syntax-error #f "Expected number or *." stx (car e)))]
                 [else
                  (raise-syntax-error #f "Expected number." stx (car e))])))))
-
-
-
-(define (weights* left low los)
-  (let loop ([left left] [low low] [los (filter score? los)])
-    (cond [(and (empty? low) (empty? los)) '()]
-          [(empty? low) (error 'weights/weights* "More scores than weights and weights does not end with *.")]
-          [(empty? los) (error 'weights/weights* "More weights than scores.")]
-          [(eqv? (car low) '*) (map (curry weight (/ left (length los))) los)]
-          [else
-           (cons (weight (car low) (car los))
-                 (loop (- left (car low))
-                       (rest low)
-                       (rest los)))])))
-         
-
-(define (total-marks scores)
-  (let* ([scores (filter score? scores)]
-         [total-weight (foldl + 0 (map score-w scores))])
-    (unless (= 1 (round* total-weight 2))
-      (error (format "Scores do not total to a weight of 1. (Totals to ~a.)" total-weight)))
-    (round* (foldl + 0 (map * (map score-w scores) (map score-m scores)))
-            2)))
-
-(define (weight n item)
-  (struct-copy %score item [w n]))
 
 
 (define (score-max . scores) (apply score-max/min >= scores))
@@ -189,13 +216,22 @@
   ;; when arriving at walk/s, %total is the weight of the enclosing s
   ;;
   (define (walk/s s %total indent)
-    (let [(new-%total (* (score-w s) %total))
-          (new-indent (string-append indent " "))]
-      (cond [(or (not (early?)) (score-report-early? s))
-             (walk/lomsg (score-msgs s) (score-header? s) (score-m s) new-%total indent new-indent #t)
-             (list new-%total (score-m s) (walk/los (score-subs s) new-%total new-indent))]
-            [else
-             (walk/los (score-subs s) new-%total new-indent)])))
+    (cond [(score? s)
+           (let [(new-%total (* (score-w s) %total))
+                 (new-indent (string-append indent " "))]
+             (cond [(and (score? s) (or (not (early?)) (score-report-early? s)))
+                    (walk/lomsg (score-msgs s) (score-header? s) (score-m s) new-%total indent new-indent #t)
+                    (list new-%total (score-m s) (walk/los (score-subs s) new-%total new-indent))]
+                   [else
+                    (walk/los (score-subs s) new-%total new-indent)]))]
+          [(reduction? s)
+           (let [(new-%total (* (reduction-w s) %total))
+                 (new-indent (string-append indent " "))]
+             (cond [(not (reduction-correct? s))
+                    (walk/msg (reduction-msg s) #f 0 (reduction-w s) indent new-indent #t #f)
+                    (list new-%total 0 '())]
+                   [else
+                    (list new-%total new-%total '())]))]))
 
   (define (walk/los los %total indent)
     (cond [(empty? los) '()]
@@ -206,16 +242,23 @@
   (define (walk/lomsg lomsg header? %mark %total old-indent new-indent first?)
     (cond [(empty? lomsg) '()]
           [else
-           (walk/msg (first lomsg) header? %mark %total old-indent new-indent first?)
+           (walk/msg (first lomsg) header? %mark %total old-indent new-indent first? #t)
            (walk/lomsg (cdr lomsg) header? %mark %total old-indent new-indent #f)]))
 
-  (define (walk/msg msg header? %mark %total old-indent new-indent first?)
+  (define (walk/msg msg header? %mark %total old-indent new-indent first? include-%of?)
     (when (if (msg-v? msg) (verbose?) #t)
       (displayln (if (and first? (not (early?)) (not (zero? %total)))
                      ;; first message in a score gets old-indent and then display the score information
-                     (format "~a  of ~a ~a~a~a ~a"
-                             (format-percent (* %mark %total))
-                             (format-percent %total)
+;                     (format "~a  of ~a ~a~a~a ~a"
+;                             (format-percent (* %mark %total))
+                     ;                             (format-percent %total)
+                     (format "~a ~a~a~a ~a"
+                             (if include-%of?
+                                 (format "~a  of ~a"
+                                         (format-percent (* %mark %total))
+                                         (format-percent %total))
+                                 (format "           ~a"
+                                         (format-percent %total)))
                              (if (= %mark 1) "   " (if header? " - " " x "))
                              old-indent
                              (msg-str msg)
