@@ -6,18 +6,16 @@
 (provide grade-lifted-definitions)
 
 
-
-
 (define-syntax (grade-lifted-definitions stx)
   (syntax-case stx ()
     [(_ defn0 call0 defn ...)
      #'(check-lifted-definitions 'defn0 'call0 '(defn ...))]))
 
+
 (define (check-lifted-definitions defn0 call0 sol-defns)
   (let* ([sexps (problem-sexps (car (context)))]
          [sexps (and (>= (length sexps) 2)
-                     ;; be lenient with people who foolishly deleted or
-                     ;; commented out the original function and/or call
+                     ;; some problems don't have the starter uncommented in the file
                      (cond [(and (equal? (car  sexps) defn0)
                                  (equal? (cadr sexps) call0))
                             (cddr sexps)]
