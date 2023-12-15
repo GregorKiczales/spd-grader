@@ -390,7 +390,9 @@ validity, and test thoroughness results are reported. No grade information is re
          (assert-context--@problem)
          (parameterize ([context (cons (get-htdf* `n) (context))])
            (header (format "~a: " (car (context)))
-                   (weights (*) item ...))))]))
+                   (let* ([defns (htdf-defns (list '@htdf 'n))]
+                          [n (and (pair? defns) (car defns))])
+                     (weights (*) item ...)))))]))
 
 (define-syntax (grade-bb-handler stx) ;this may be too specialized for this file
   (syntax-case stx ()
