@@ -135,12 +135,11 @@ NOTE: This problem will be autograded, and ALL OF THE FOLLOWING ARE ESSENTIAL
          ;; specially allow and/or to be used in the grade-use-bia-fn composition/combinations
          [called-bia-fns (special-calls (caddr defn) all-bia-fns)])
 
-    (ensure (unchanged? (list sig) sexps) "must not edit signature in starter file")
-    (ensure (unchanged? supplied sexps)   "must not edit tests in starter file")
     (ensure (pair? (caddr defn))          "fn definition must be more than stub")
     (ensure (= (length defns) 1)          "must define single top-level function")
     (ensure (not (recursive? defn))       "must not be recursive")
     (ensure (not (empty? called-bia-fns)) "must call one or more built-in abstract functions")
+
 
     (let* ([comp (infer-bia-fn-composition (datum->syntax #f defn) all-bia-fns)]
            [entry                     (lookup comp max-marks-and-comps)]
@@ -163,6 +162,10 @@ NOTE: This problem will be autograded, and ALL OF THE FOLLOWING ARE ESSENTIAL
 
       (header (format "Use built-in abstract function -")
         (weights (10/100 45/100 45/100)
+
+          (reduce-it 'other 10/100 (unchanged? (list sig) sexps) "must not edit signature in starter file")
+          (reduce-it 'other 10/100 (unchanged? supplied sexps)   "must not edit tests in starter file")
+
           (score-it 'template-origin 1 to-score #f
                     (format "@template-origin tag: ~a."
                             (cond [(= to-score 0) "incorrect"]
@@ -174,6 +177,7 @@ NOTE: This problem will be autograded, and ALL OF THE FOLLOWING ARE ESSENTIAL
                             (cond [(= ti-score 0) "incorrect"]
                                   [(= ti-score 1)   "correct"]
                                   [else "partially correct"])))
+          
           (check-additional-tests fn-name additional))))))
 
 
