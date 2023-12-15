@@ -58,8 +58,10 @@
 
 
 (define (name-base? x s)
-  (string=? (substring (symbol->string x) 0 (string-length (symbol->string s)))
-            (symbol->string s)))
+  (let ([x-str (symbol->string x)]
+        [s-str (symbol->string s)])
+    (and (>= (string-length x-str) (string-length s-str))
+         (string=? (substring x-str 0 (string-length s-str)) s-str))))
 
 (define (has_? x s)
   (let* [(x-string (symbol->string x))
