@@ -135,14 +135,16 @@ Standard directions are:
                                   (eqv? (car body) 'local)
                                   (filter fn-defn? (cadr body)))]
          
-         [local-fn-defns   (for/list ([name local-fn-names]
-                                      [i (in-naturals)])
-                             (if (eqv? name '*)
-                                 (list-ref all-local-fn-defns i)
-                                 (findf (lambda (defn)
-                                          (eqv? (caadr defn) name))
-                                        all-local-fn-defns)))]
-         [local-params (map (lambda (defn) (cdadr defn)) local-fn-defns)]
+         [local-fn-defns     (and all-local-fn-defns
+                                  (for/list ([name local-fn-names]
+                                             [i (in-naturals)])
+                                    (if (eqv? name '*)
+                                        (list-ref all-local-fn-defns i)
+                                        (findf (lambda (defn)
+                                                 (eqv? (caadr defn) name))
+                                               all-local-fn-defns))))]
+         [local-params       (and local-fn-defns
+                                  (map (lambda (defn) (cdadr defn)) local-fn-defns))]
 
          [a-params
           (cond [(= min-accs max-accs 1)       "last parameter"]
@@ -156,13 +158,14 @@ Standard directions are:
       (rubric-item 'template-intact (not (false? x))
                    "accumulator template intact - ~a of ~a are the same"
                    a-params a-fns))
-    
+
     (weights (.4 *)
       (rubric-item 'template-intact (pair? local-fn-defns)
                    "accumulator template intact - top-level function definition around local function definition")
       (let loop
           ([n max-accs])
-        (cond [(< n min-accs)                (ri false)]
+        (cond [(not (pair? local-params))    (ri false)]
+              [(< n min-accs)                (ri false)]
               [(tails-equal? n local-params) (ri n)]
               [else
                (loop (sub1 n))])))))
@@ -172,7 +175,7 @@ Standard directions are:
   
   (define (tail lox) (and (>= (length lox) n) (take-right lox n)))
   
-  (let ([tail0 (tail (first lolox))])
+  (let ([tail0 (tail (car lolox))])
     (andmap (lambda (loxn)
               (equal? (tail loxn) tail0))
             (rest lolox))))
