@@ -161,7 +161,7 @@ NOTE: This problem will be autograded, and ALL OF THE FOLLOWING ARE ESSENTIAL
                    (if (member 'use-abstract-fn to-tag) 1 0)])])
 
       (header (format "Use built-in abstract function -")
-        (weights (10/100 45/100 45/100)
+        (weights (.05 .40 .55)
 
           (reduce-it 'other 10/100 (unchanged? (list sig) sexps) "must not edit signature in starter file")
           (reduce-it 'other 10/100 (unchanged? supplied sexps)   "must not edit tests in starter file")
