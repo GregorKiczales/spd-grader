@@ -136,6 +136,7 @@ Standard directions are:
                                   (filter fn-defn? (cadr body)))]
          
          [local-fn-defns     (and all-local-fn-defns
+                                  (>= (length all-local-fn-defns) (length local-fn-names))
                                   (for/list ([name local-fn-names]
                                              [i (in-naturals)])
                                     (if (eqv? name '*)
