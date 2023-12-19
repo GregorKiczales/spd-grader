@@ -906,7 +906,7 @@ validity, and test thoroughness results are reported. No grade information is re
                                       (andmap (lambda (c) (eqv? (call-ctx c) 'tail)) local-calls)
                                       "All recursive or mutually recursive calls must be in tail position") 
                          (for/list ([c local-calls])
-                           (score-it 'template-intact 0 0 #f
+                           (score-it 'template-intact 0 0 (eqv? (call-ctx c) 'tail)
                                      "Call must be in tail position ~a"
                                      (syntax->datum (call-stx c)))))))))))
 
