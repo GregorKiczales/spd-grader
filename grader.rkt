@@ -864,15 +864,23 @@ validity, and test thoroughness results are reported. No grade information is re
                      "Expression evaluates to ~s" (calling-evaluator #f value-expr))))))
 
 
-(define (grade-tail-recursive [n 1] [local-names #f])
+(define (grade-tail-recursive [n 1] [local-fn-names #f])
+  (println (car (context)))
   (let* ([htdf   (car (context))]
          [defns  (and htdf (htdf-defns htdf))]
          [defn   (and (>= (length defns) n) (list-ref defns (sub1 n)))]
-         [local-defns (and defn (filter fn-defn? (cdr (defines defn))))]
-         [local-names (or local-names (and local-defns (map caadr local-defns)))]
-         [local-calls (and local-defns (filter (lambda (c)
-                                                 (member (call-called-fn-name c) local-names))
-                                               (foldr append '() (map calls2 local-defns))))])
+         [body   (and (fn-defn? defn) (caddr defn))]
+         
+         [local-defns (and (list? body)
+                           (= (length body) 3)
+                           (eqv? (car body) 'local)
+                           (filter fn-defn? (cadr body)))]
+         [local-names (or local-fn-names (and local-defns (map caadr local-defns)))]
+         [local-calls (and local-defns
+                           (filter (lambda (c)
+                                     (member (call-called-fn-name c) local-names))
+                                   (foldr append '() (map calls2 local-defns))))])
+
 
     (if (or (not local-defns) (null? local-defns))
         (rubric-item 'template-intact #f "Local expression with functions present")
