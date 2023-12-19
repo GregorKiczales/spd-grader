@@ -865,7 +865,6 @@ validity, and test thoroughness results are reported. No grade information is re
 
 
 (define (grade-tail-recursive [n 1] [local-fn-names #f])
-  (println (car (context)))
   (let* ([htdf   (car (context))]
          [defns  (and htdf (htdf-defns htdf))]
          [defn   (and (>= (length defns) n) (list-ref defns (sub1 n)))]
@@ -882,23 +881,8 @@ validity, and test thoroughness results are reported. No grade information is re
                                    (foldr append '() (map calls2 local-defns))))])
 
 
-    (if (or (not local-defns) (null? local-defns))
-        (rubric-item 'template-intact #f "Local expression with functions present")
-        #;
-        (score #t
-               'template-intact 1
-                (if (andmap (lambda (c) (eqv? (call-ctx c) 'tail)) local-calls) 1 0)
-                '()
-                (cons (msg #t
-                           (format "All recursive or mutually recursive calls must be in tail position: ~a."
-                                   (if (andmap (lambda (c) (eqv? (call-ctx c) 'tail)) local-calls) "correct" "incorrect")))
-                      (for/list ([c local-calls])
-                        (msg #t
-                             (format "Call must be in tail position ~a: ~a."
-                                     (syntax->datum (call-stx c))
-                                     (if (eqv? (call-ctx c) 'tail) "correct" "incorrect"))))))
-
-        
+    (if (or (not local-calls) (null? local-calls))
+        (rubric-item 'template-intact #f "Local expression with function definitions present")
         (header "Tail recursive: "
                 (combine-scores
                  (weights* 1.0 '(1 *)
