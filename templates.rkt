@@ -143,7 +143,7 @@ Standard directions are:
                                                all-local-fn-defns))))])
 
     ;; !!! this mess should be handled with guard-...
-    (if (member #f local-fn-defns)
+    (if (or (false? local-fn-defns) (member #f local-fn-defns))
         (score #f 'template-intact 1 0 '() (list (message #f "accumulator template intact: not graded because template functions renamed")))
         (let ([local-params
                (and local-fn-defns
