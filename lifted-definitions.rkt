@@ -40,7 +40,7 @@
                                                  (name-base? (caadr d) original-name)))
                                           sub-defns)]
                     [nth           (number->ordinal (add1 (occurrences original-name original-names)))])
-               (cons (grade-prerequisite 'other (format "!!! lifting of ~a exists" original-name) sub-defn
+               (cons (grade-prerequisite 'other (format "Lifting of ~a exists" original-name) sub-defn
                        (header (format "~a lifting of ~a" nth original-name)
                          (weights (*)
                            (rubric-item 'other (has_?  (caadr sub-defn) original-name)    "new name has _ after original name")
