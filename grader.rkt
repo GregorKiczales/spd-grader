@@ -386,13 +386,20 @@ validity, and test thoroughness results are reported. No grade information is re
 (define-syntax (grade-htdf stx)
   (syntax-case stx ()
     [(_ n item ...)
-     #'(begin ;recovery-point n !!!
-         (assert-context--@problem)
-         (parameterize ([context (cons (get-htdf* `n) (context))])
-           (header (format "~a: " (car (context)))
-                   (let* ([defns (htdf-defns (list '@htdf 'n))]
-                          [n (and (pair? defns) (car defns))])
-                     (weights (*) item ...)))))]))
+     (if (identifier? #'n)
+         #'(begin ;recovery-point n !!!
+             (assert-context--@problem)
+             (parameterize ([context (cons (get-htdf* `n) (context))])
+               (header (format "~a: " (car (context)))
+                       (let* ([defns (htdf-defns (car (context)))] ;!!!(list '@htdf 'n))]
+                              [n (and (pair? defns) (car defns))])
+                         (weights (*) item ...)))))
+         
+         #'(begin ;recovery-point n !!!
+             (assert-context--@problem)
+             (parameterize ([context (cons (get-htdf* `n) (context))])
+               (header (format "~a: " (car (context)))
+                 (weights (*) item ...)))))]))
 
 (define-syntax (grade-bb-handler stx) ;this may be too specialized for this file
   (syntax-case stx ()
@@ -1379,6 +1386,10 @@ validity, and test thoroughness results are reported. No grade information is re
 (define (defn?                 x) (or (fn-defn? x) (const-defn? x) (struct-defn? x)))
 
 (define (check-expect?         x) (and (pair? x) (eq? (car x) 'check-expect)))
+
+(define fn-defn-name       caadr)
+(define fn-defn-parameters cdadr)
+(define fn-defn-body       caddr)
 
 
 
