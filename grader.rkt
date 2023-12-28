@@ -853,38 +853,39 @@ validity, and test thoroughness results are reported. No grade information is re
 
          [sub-ndefns   (length sub-defns)]
          [sub-free     (free sub-expr)]
-         [sub-values   (constants sub-expr)])
+         [sub-values   (constants sub-expr)]
+
+         [scores
+          (list
+           (if (zero? sol-ndefns)
+               (rubric-item 'other (zero? sub-ndefns) "Does not add any definitions")
+               (rubric-item 'other
+                            (and (= sub-ndefns sol-ndefns)
+                                 (equal? (take sub sol-ndefns) sol-defns))
+                            "Does not comment out, edit or add to the ~a supplied in starter file"
+                            (pluralize sol-ndefns "definition")))
+           
+           (if (zero? sol-ndefns)
+               (rubric-item 'other sub-expr "Has a single top-level expression")
+               (rubric-item 'other
+                            sub-expr
+                            "Has a single top-level expression following the ~a supplied in the starter file"
+                            (pluralize sol-ndefns "definition")))
+           
+           (and (pair? must-use-free)
+                (rubric-item 'other
+                             (andmap (lambda (s) (member s sub-free)) must-use-free)
+                             "Expression uses required CONSTANTs"))
+           
+           (rubric-item 'eval-etc
+                        (calling-evaluator #f `(equal? ,sub-expr ,sol-expr))
+                        "Expression evaluates to correct value"))])
 
     (header "Top-level expression:"
       (combine-scores
-
-       (weights* 1.0 '(*)
-         (remove #f
-                 (list
-
-                  (if (zero? sol-ndefns)
-                      (rubric-item 'other (zero? sub-ndefns) "Does not add any definitions")
-                      (rubric-item 'other
-                                   (and (= sub-ndefns sol-ndefns)
-                                        (equal? (take sub sol-ndefns) sol-defns))
-                                   "Does not comment out, edit or add to the ~a supplied in starter file"
-                                   (pluralize sol-ndefns "definition")))
-                  
-                  (if (zero? sol-ndefns)
-                      (rubric-item 'other sub-expr "Has a single top-level expression")
-                      (rubric-item 'other
-                                   sub-expr
-                                   "Has a single top-level expression following the ~a supplied in the starter file"
-                                   (pluralize sol-ndefns "definition")))
-
-                  (and (pair? must-use-free)
-                       (rubric-item 'other
-                                    (andmap (lambda (s) (member s sub-free)) must-use-free)
-                                    "Expression uses required CONSTANTs"))
-          
-                  (rubric-item 'eval-etc
-                               (calling-evaluator #f `(equal? ,sub-expr ,sol-expr))
-                               "Expression evaluates to correct value"))))))))
+       (if (member #f scores)
+           (weights* 1.0 '(.15 .15     *) (remove #f scores))
+           (weights* 1.0 '(.10 .10 .10 *) scores))))))
 
 (define (pluralize n str)
   (if (= n 1) str (format "~a ~as" n str)))
