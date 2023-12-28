@@ -62,7 +62,7 @@
     (let ([e (syntax-e stx)])
       (cond [(value? e)    (p 'value    stx e ctx env in-fn (lambda () e))]
             [(constant? e) (p 'constant stx e ctx env in-fn (lambda () e))]
-            [(null? e)     (p 'null     stx e ctx env in-fn (lambda () e))]
+            [(null? e)     (p 'null     stx e ctx env in-fn (lambda () e))] ;!!! does this ever happen?
             [(symbol? e)
              (if (assq e env)
                  (p 'bound stx e ctx env in-fn (lambda () e))
