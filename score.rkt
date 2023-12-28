@@ -88,7 +88,7 @@
            #,@(map cadr es)))]))
 
 (define (weights* left low los)
-  (let loop ([left left] [low low] [los los]) ;!!!(filter score? los)])
+  (let loop ([left left] [low low] [los (filter score? los)]) ;ensure produces (void)
     (cond [(and (empty? low) (empty? los)) '()]
           [(empty? low) (error 'weights/weights* "More scores than weights and weights does not end with *.")]
           [(empty? los) (error 'weights/weights* "More weights than scores.")]

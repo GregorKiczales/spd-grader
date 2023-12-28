@@ -467,7 +467,7 @@ validity, and test thoroughness results are reported. No grade information is re
          (let* ([htdf    (car (context))]
                 [fn-name (list-ref (htdf-names htdf) 0)]
                 [tests   (get-function-tests fn-name)])
-           (check-tests-validity fn-name tests (append (list 'p ...) (list 'r)) (list `check ...))))]))
+           (check-tests-validity fn-name tests (append (list 'p ...) (list 'r)) `(check ...))))]))
 
 (define-syntax (grade-tests-argument-thoroughness stx)
   (syntax-case stx ()
@@ -547,8 +547,9 @@ validity, and test thoroughness results are reported. No grade information is re
                                                         checker-names)
                                                  [else 
                                                   (.loop. (cdr lo-args-and-result))])]))]
-                            (.loop. ',lo-args-and-result))))]
+                            (.loop. ',lo-args-and-result))))]                    
                     [% (/ (max 0 (- (length ce-s) (length fails) nerr)) (length ce-s))])
+
         
                (cond [(= % 1)             (score-it 'test-validity 1 1 #f "Test validity (matches problem statement): correct.")]
                      [(zero? nerr)        (score-it 'test-validity 1 % #f "Test validity (matches problem statement): incorrect - one or more tests invalid.")]
@@ -834,34 +835,59 @@ validity, and test thoroughness results are reported. No grade information is re
 ;;
 (define-syntax (grade-top-level-expression stx)
   (syntax-case stx ()
-    [(_ defns must-use-free value-expr)
+    [(_ must-use-free defns ... value-expr)
      #'(recovery-point grade-top-level-expression
 	 (assert-context--@problem)
-         (check-top-level-expression `defns `must-use-free `value-expr))]))
+         (check-top-level-expression `must-use-free `(defns ...) `value-expr))]))
 
-(define (check-top-level-expression defns must-use-free value-expr)
+(define (check-top-level-expression must-use-free sol-defns sol-expr)
   (let* ([problem (car (context))]
-         [sexps (problem-sexps problem)]
-         [ndefns (length defns)])
-    (ensure (and (>= (length sexps) ndefns)
-                 (equal? (take sexps ndefns) defns))
-            "must not comment out or edit ~a definitions supplied in starter file" ndefns)
-    (ensure (= (length sexps) (add1 ndefns))
-            "must have a single top-level expression following ~a definitions supplied in starter file" ndefns)
-    (let* ([sexp (last sexps)]
-           [uses-free     (free sexp)]
-           [uses-constant (constants sexp)]
-           [permitted-constants (constants value-expr)])
-      (weights (*)
-        (rubric-item 'eval-etc 
-                     (andmap (lambda (s) (member s uses-free)) must-use-free)
-                     "Expression uses required CONSTANT definitions")
-        (rubric-item 'eval-etc 
-                     (andmap (lambda (s) (member s permitted-constants)) uses-constant)
-                     "Expression uses inappropriate inline value")
-        (rubric-item 'eval-etc
-                     (calling-evaluator #f `(equal? ,sexp ,value-expr))
-                     "Expression evaluates to ~s" (calling-evaluator #f value-expr))))))
+         
+         [sol-ndefns   (length sol-defns)]
+         [sol-free     (free sol-expr)]
+         [sol-values   (constants sol-expr)] ;!!! rename constant to values or something
+         
+         [sub          (problem-sexps problem)]
+         [sub-defns    (filter defn? sub)]
+         [sub-expr     (and (not (defn? (last sub))) (last sub))]
+
+         [sub-ndefns   (length sub-defns)]
+         [sub-free     (free sub-expr)]
+         [sub-values   (constants sub-expr)])
+
+    (header "Top-level expression:"
+      (combine-scores
+
+       (weights* 1.0 '(*)
+         (remove #f
+                 (list
+
+                  (if (zero? sol-ndefns)
+                      (rubric-item 'other (zero? sub-ndefns) "Does not add any definitions")
+                      (rubric-item 'other
+                                   (and (= sub-ndefns sol-ndefns)
+                                        (equal? (take sub sol-ndefns) sol-defns))
+                                   "Does not comment out, edit or add to the ~a supplied in starter file"
+                                   (pluralize sol-ndefns "definition")))
+                  
+                  (if (zero? sol-ndefns)
+                      (rubric-item 'other sub-expr "Has a single top-level expression")
+                      (rubric-item 'other
+                                   sub-expr
+                                   "Has a single top-level expression following the ~a supplied in the starter file"
+                                   (pluralize sol-ndefns "definition")))
+
+                  (and (pair? must-use-free)
+                       (rubric-item 'other
+                                    (andmap (lambda (s) (member s sub-free)) must-use-free)
+                                    "Expression uses required CONSTANTs"))
+          
+                  (rubric-item 'eval-etc
+                               (calling-evaluator #f `(equal? ,sub-expr ,sol-expr))
+                               "Expression evaluates to correct value"))))))))
+
+(define (pluralize n str)
+  (if (= n 1) str (format "~a ~as" n str)))
 
 
 (define (grade-tail-recursive [n 1] [local-fn-names #f])
