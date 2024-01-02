@@ -137,9 +137,12 @@
 (define (plural n)
   (if (> n 1) "s" ""))
 
+(define (pluralize n str)
+  (format "~a ~a~a" n str (plural n)))
+
 (define (naturals->text lon)
   (define (scan lon)
-    (cond [(empty? (rest lon)) (format " and ~a" (car lon))]
+    (cond [(empty? (rest lon)) (format ", and ~a" (car lon))]
           [else (format ", ~a~a" (car lon) (scan (rest lon)))]))
 
   (cond [(empty? lon) ""]
