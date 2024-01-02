@@ -354,7 +354,7 @@ validity, and test thoroughness results are reported. No grade information is re
   (score-it 'other 0 0 #f "This item is not graded."))
 
 
-(define-syntax (grade-problem-sexps stx)
+(define-syntax (grade-sexps stx)
   (syntax-case stx ()
     [(_ desc sexps)
      #'(check-sexps desc (problem-sexps (car (context))) `sexps)]))
@@ -737,21 +737,33 @@ validity, and test thoroughness results are reported. No grade information is re
     [(_ n constants)
      #'(recovery-point grade-constants-use
          (assert-context--@htdf)
-	 (weights (*)
-              (let* ([htdf (car (context))]
-                     [defns (htdf-defns htdf)])
-                (check-bounds n (length defns) "function definition")
-                (check-constants-use (list-ref defns (sub1 n)) 'constants (list-ref htdf n) false))))]))
+         (let* ([htdf (car (context))]
+                [defns (htdf-defns htdf)])
+           (check-bounds n (length defns) "function definition")
+           (check-constants-use (list-ref defns (sub1 n)) 'constants (list-ref htdf n) false)))]))
 
 (define-syntax (grade-tests-constants-use stx)
   (syntax-case stx ()
     [(_ n constants)
      #'(recovery-point grade-tests-constants-use
 	(assert-context--@htdf)
-	(weights (*)
-	  (let* ([htdf (car (context))]
-		 [tests (htdf-checks htdf)])
-	    (check-constants-use tests 'constants (list-ref htdf n) true))))]))
+        (let* ([htdf (car (context))]
+               [tests (htdf-checks htdf)])
+          (check-constants-use tests 'constants (list-ref htdf n) true)))]))
+
+
+(define (check-constants-use defn constants htdf tests?)
+  (let* ([free-defn (free defn)]
+         [constants-not-used (filter (lambda (x) (not (member x free-defn))) constants)]
+         [% (/ (- (length constants) (length constants-not-used))
+               (length constants))])
+    (score-it 'submitted-tests 1 % #f
+              (format "~a ~a: ~a."
+                      (if tests? "Tests use" (format "Function body uses"))
+                      (pluralize (length constants) "required constant")
+                      (cond [(= % 1) "correct"]
+                            [(> % 0) "partially correct"]
+                            [else    "incorrect"])))))
 
 
 
@@ -893,9 +905,6 @@ validity, and test thoroughness results are reported. No grade information is re
        (if (member #f scores)
            (weights* 1.0 '(.15 .15     *) (remove #f scores))
            (weights* 1.0 '(.10 .10 .10 *) scores))))))
-
-(define (pluralize n str)
-  (if (= n 1) str (format "~a ~as" n str)))
 
 
 (define (grade-tail-recursive [n 1] [local-fn-names #f])
@@ -1140,20 +1149,6 @@ validity, and test thoroughness results are reported. No grade information is re
                                (score-it 'template-origin 1 0 #f "~a: incorrect (missing)." req)))
                          (for/list ([pna present-not-allowed])
                            (score-it 'template-origin 1 0 #f "~a: incorrect (not allowed)." pna))))))))
-
-
-
-
-(define (check-constants-use defn constants htdf check-for-tests?)
-  (let* ([free-defn (free defn)]
-         [constants-not-used (filter (lambda (x) (not (member x free-defn))) constants)])
-    (if (empty? constants-not-used)
-        (score #f 'other 1 1 '() '())
-        (score #f 'other 1 0 '() (map (lambda (x)
-                                        (if check-for-tests?
-                                            (message #f "the check-expects do not use the constant ~a." x)
-                                            (message #f "answer for function ~a does not use ~a." htdf x)))
-                                      constants-not-used)))))
 
 
 
