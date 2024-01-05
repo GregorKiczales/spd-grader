@@ -99,7 +99,7 @@
                                               (score-it 'other 1 0 #f "Error evaluating submitted code - ~a" (exn-message e))
                                               (score-it 'other 1 0 #f "Error evaluating grader code that calls submitted code - ~a" (exn-message e))))]
                                 [else
-                                 ((logger) (format "Grader system error ~a: ~a" n (exn-message e)))
+                                 ((logger) (format "Internal grader system error ~a: ~a" n (exn-message e)))
                                  (weights (*) (score-it 'other 1 1 #f "Internal grader system error, student given 100% on this problem. This does not necessarily mean the submission is correct. Grade may change when grader system error is fixed."))]))])
          exp ...)]))
 
@@ -232,9 +232,9 @@
                   (abort-current-continuation abort-tag (lambda () (void))))
 
                 (define (handle-framework-error exn)
-                  (logger (format "Error: Framework error for submission ~a - ~a"
-                                  filename
-                                  (if (exn? exn) (exn-message exn) exn)))
+                  ((logger) (format "Error: Framework error for submission ~a - ~a"
+                                    filename
+                                    (if (exn? exn) (exn-message exn) exn)))
                   (display-overall-grade 100
                                          (format "Autograder framework error. ~a"
                                                  (if (exn? exn) (exn-message exn) exn))
@@ -245,8 +245,8 @@
                    (let ([e
                           ;; this handles errors in initial running of submission
                           (with-handlers ([exn:fail:resource? handle-resource-error]
-                                          [exn:fail? handle-submission-error])       ;!!! exn:fail? was void
-                           (make-evaluator lang                                    
+                                          [exn:fail? handle-submission-error])                            
+                           (make-evaluator lang
                                            in
                                            ;#:requires '(spd/tags)
                                            #:allow-for-load (list
@@ -488,18 +488,22 @@ validity, and test thoroughness results are reported. No grade information is re
 
 (define-syntax (grade-argument-thoroughness stx)
   (syntax-case stx (all-args per-args)
-    [(_ (all-args (paa)   aacheck ...)
+    [(_ lop
+        (all-args (paa)   aacheck ...)
         (per-args (p ...) check ...))
      #'(begin
          (assert-context--@htdf)
          (let* ([htdf      (car (context))]
                 [fn-name   (car (htdf-names htdf))]
                 [tests     (get-function-tests fn-name)])
-           (check-argument-thoroughness fn-name tests 'paa (list `aacheck ...) (list 'p ...) (list `check ...))))]
-    [(_ (all-args (paa ...) aacheck ...))
-     #'(grade-argument-thoroughness (all-args (paa ...) aacheck ...) (per-args (_)              ))]
-    [(_ (per-args (p ...) check ...))
-     #'(grade-argument-thoroughness (all-args (_)                  ) (per-args (p ...) check ...))]))
+           (check-argument-thoroughness fn-name tests 'lop 'paa (list `aacheck ...) (list 'p ...) (list `check ...))))]
+    [(_ lop (all-args (paa ...) aacheck ...))
+     #'(grade-argument-thoroughness lop (all-args (paa ...) aacheck ...) (per-args (_)              ))]
+    [(_ lop (per-args (p ...) check ...))
+     #'(grade-argument-thoroughness lop (all-args (_)                  ) (per-args (p ...) check ...))]
+    [(_ lop)
+     #'(grade-argument-thoroughness lop (all-args (_)                  ) (per-args (_)              ))]))
+
 
 (define-syntax (grade-thoroughness-by-faulty-functions stx)
   (syntax-case stx ()
@@ -565,81 +569,74 @@ validity, and test thoroughness results are reported. No grade information is re
 
            ])))
 
-(define (check-argument-thoroughness fn-name tests aaparam aachecks params checks)
+(define (check-argument-thoroughness fn-name tests lop aaparam aachecks paparams pachecks)
   (let ([ce-s (filter check-expect? tests)])
-    (cond [(= (length ce-s) 0)    (score-it 'test-thoroughness 1 0 #f "Test thoroughness (test argument coverage): incorrect - at least 1 test is required.")]
+    (cond [(= (length ce-s) 0)
+           (score-it 'test-thoroughness 1 0 #f "Test thoroughness (test argument coverage): incorrect - at least 1 test is required.")]
           [else
            (let-values ([(lo-args-and-result nerr) (get-tests-args-and-result fn-name ce-s)])
              (let* ([lo-args (map (lambda (lst) (drop-right lst 1)) lo-args-and-result)]
-                    [check-names   (map (lambda (check) (gensym "check")) checks)]
-                    [check-numbers (sequence->list (in-range 1 (+ 1 (length aachecks) (length checks))))]
-            
-                    [sat-checks
-                     ;; numbers of checks that at least one set of arguments satisfied
-                     (with-handlers ([exn:fail? (lambda (e) #f)])
-                       (remove-duplicates
-                        (calling-evaluator #f
-                          `(local [,@(map (lambda (check name num)
-                                            `(define (,name ,@params) (if ,check (list ,num) '())))
-                                          checks
-                                          check-names
-                                          (drop check-numbers (length aachecks)))
-                                 
-                                   (define (.loop. lo-args1)
-                                     (cond [(empty? lo-args1) '()]
-                                           [else
-                                            (append ,@(map (lambda (check-name)
-                                                             `(apply ,check-name #;',lo-args (car lo-args1)))
-                                                           check-names)
-                                                    (.loop. (cdr lo-args1)))]))
+                    [equal-positions (filter (lambda (p) (not (member p lop))) (test-args-equal-positions lo-args))])
+               (if (not (null? equal-positions))
+                   (score #f 'test-thoroughness 1 0
+                          '()
+                          (cons (message #f "Test thoroughness (test argument coverage): incorrect -")
+                                (for/list ([p equal-positions])
+                                  (message #f " In every test the value of argument ~a is the same." p))))
+                   
+                   (let* ([check-numbers (build-list (+ (length aachecks) (length pachecks)) add1)]
+                          [aa-check-numbers (take check-numbers (length aachecks))]
+                          [pa-check-numbers (drop check-numbers (length aachecks))]
+                          
+                          [sat-checks
+                           ;; numbers of checks that at least one set of arguments satisfied
+                           (with-handlers ([exn:fail? (lambda (e) #f)])
+                             (remove-duplicates
+                              (calling-evaluator #f
+                                                 `(local [(define (%%all-args-checks ,aaparam)   ;called once with all the args
+                                                            ,(if (null? aachecks)
+                                                                 'empty
+                                                                 `(append
+                                                                   ,@(map (lambda (aac aacn) `(if ,aac (list ,aacn) '()))
+                                                                          aachecks
+                                                                          aa-check-numbers))))
 
-                                   (define ,aaparam ',lo-args)]
-                             (append ,@(map (lambda (aac aacn)
-                                              `(if ,aac (list ,aacn) '()))
-                                            aachecks
-                                            (take check-numbers (length aachecks)))
-                                     (.loop. ,aaparam))))))]
-                    [% (and sat-checks (/ (max 0 (- (length sat-checks) nerr)) (+ (length aachecks) (length checks))))])
+                                                          (define (%%per-args-checks ,@paparams)  ;called once per set of args
+                                                            ,(if (null? pachecks)
+                                                                 'empty
+                                                                 `(append
+                                                                   ,@(map (lambda (pac pacn) `(if ,pac (list ,pacn) '()))
+                                                                          pachecks
+                                                                          pa-check-numbers))))
+                                                            
+                                                          (define (%%loop lo-args1)
+                                                            (cond [(empty? lo-args1) '()]
+                                                                  [else
+                                                                   (append (apply %%per-args-checks (car lo-args1))
+                                                                           (%%loop (cdr lo-args1)))]))]
 
-               (cond [(false? sat-checks) (score-it 'test-thoroughness 1 0 #f "Test thoroughness (test argument coverage): incorrect - one or more tests caused an error.")]
-                     [(= % 1)             (score-it 'test-thoroughness 1 1 #f "Test thoroughness (test argument coverage): correct.")]
-                     [else                (score-it 'test-thoroughness 1 % #f "Test thoroughness (test argument coverage): incorrect - missing one or more cases.")])))])))
+                                                    (append ,(if (null? aachecks) 'empty `(%%all-args-checks ',lo-args))
+                                                            ,(if (null? pachecks) 'empty `(%%loop            ',lo-args)))))))]
+                             
+                           [% (and sat-checks
+                                   (if (and (null? aachecks) (null? pachecks))
+                                       1
+                                       (/ (max 0 (- (length sat-checks) nerr)) (+ (length aachecks) (length pachecks)))))])
+                     
+                     (cond [(false? sat-checks) (score-it 'test-thoroughness 1 0 #f "Test thoroughness (test argument coverage): incorrect - one or more tests caused an error.")]
+                           [(= % 1)             (score-it 'test-thoroughness 1 1 #f "Test thoroughness (test argument coverage): correct.")]
+                           [else                (score-it 'test-thoroughness 1 % #f "Test thoroughness (test argument coverage): incorrect - missing one or more cases.")])))))])))
 
+(define (test-args-equal-positions lo-args)
+  (let* ([nargs (length (car lo-args))])
+    (map add1
+         (filter (lambda (i)
+                   (let ([args-at-p (for/list ([args lo-args]) (list-ref args i))])
+                     (andmap (lambda (x) (equal? x (car args-at-p))) (cdr args-at-p))))
+                 (sequence->list (in-range nargs))))))
 
-(define (check-tests-argument-thoroughness fn-name tests params checks)
-  (let ([ce-s (filter check-expect? tests)])
-    (cond [(= (length ce-s) 0)    (score-it 'test-thoroughness 1 0 #f "Test thoroughness (test argument coverage): incorrect - at least 1 test is required.")]
-          [else
-           (let-values ([(lo-args-and-result nerr) (get-tests-args-and-result fn-name ce-s)])
-             (let* ([lo-args (map (lambda (lst) (drop-right lst 1)) lo-args-and-result)]
-                    [check-names (map (lambda (check) (gensym "check")) checks)]
-                    [check-numbers (sequence->list (in-range 1 (add1 (length checks))))]
-            
-                    [sat-checks
-                     ;; list of numbers of checks that at least one set of arguments satisfied
-                     (with-handlers ([exn:fail? (lambda (e) #f)])
-                       (remove-duplicates
-                         (calling-evaluator #f
-                           `(local [,@(map (lambda (check name num)
-                                             `(define (,name ,@params) (if ,check (list ,num) '())))
-                                           checks
-                                           check-names
-                                           check-numbers)
-                                    
-                                    (define (.loop. lo-args1)
-                                      (cond [(empty? lo-args1) '()]
-                                            [else
-                                             (append ,@(map (lambda (check-name)
-                                                              `(apply ,check-name (car lo-args1)))
-                                                            check-names)
-                                                     (.loop. (cdr lo-args1)))]))]
-                              (.loop. ',lo-args)))))]
-                    [% (and sat-checks
-                            (/ (max 0 (- (length sat-checks) nerr)) (length checks)))])
-
-               (cond [(false? sat-checks) (score-it 'test-thoroughness 1 0 #f "Test thoroughness (test argument coverage): incorrect - one or more tests caused an error.")]
-                     [(= % 1)             (score-it 'test-thoroughness 1 1 #f "Test thoroughness (test argument coverage): correct.")]
-                     [else                (score-it 'test-thoroughness 1 % #f "Test thoroughness (test argument coverage): incorrect - missing one or more cases.")])))])))
+(define (check-tests-argument-thoroughness fn-name tests paparams pachecks)
+  (check-argument-thoroughness fn-name tests '() '_ '() paparams pachecks))
 
                      
 (define (check-thoroughness fn-name tests all-defs)
@@ -1426,17 +1423,23 @@ validity, and test thoroughness results are reported. No grade information is re
 
 
 
+;; compiling graders and/or keeping a table of already loaded graders
+;; does not make any appreciable performance difference, so to keep
+;; things simple we just reload the grader each time
 
 (define (find-grader fn)
   (let ([tag (find-assignment-tag fn)])
-    (if tag
+    (if (not tag)
+        default-grader
         (let* ([elts (string-split (symbol->string (cadr tag)) "/")]
-               [fn (build-path (apply build-path GRADERS-DIR (drop-right elts 1))
-                               (string-append (car (take-right elts 1)) "-grader.rkt"))])
-          (if (file-exists? fn)
-              (auto-reload-procedure fn 'grader)
-              default-grader))
-        default-grader)))
+               [dir (apply build-path GRADERS-DIR (drop-right elts 1))]
+               #;
+               [compiled (build-path dir
+                                     "compiled"
+                                     (string-append (car (take-right elts 1)) "-grader_rkt.zo"))]
+               [source   (build-path dir
+                                     (string-append (car (take-right elts 1)) "-grader.rkt"))])
+          (auto-reload-procedure source 'grader)))))
 
 (define (has-grader? p)
   (with-handlers ([exn:fail? (lambda (e) #f)])
