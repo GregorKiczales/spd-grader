@@ -466,6 +466,7 @@ validity, and test thoroughness results are reported. No grade information is re
 		[fn-name (if (symbol? n) n (list-ref (htdf-names htdf) (sub1 n)))])
            (check-additional-tests fn-name `(test ...))))]))
 
+
 (define-syntax (grade-tests-validity stx)
   (syntax-case stx ()
     [(_ (p ...) r check ...)
@@ -476,33 +477,36 @@ validity, and test thoroughness results are reported. No grade information is re
                 [tests   (get-function-tests fn-name)])
            (check-tests-validity fn-name tests (append (list 'p ...) (list 'r)) `(check ...))))]))
 
-(define-syntax (grade-tests-argument-thoroughness stx)
-  (syntax-case stx ()
-    [(_ (p ...) check ...)
-     #'(begin
-	(assert-context--@htdf)
-	(let* ([htdf      (car (context))]
-               [fn-name   (car (htdf-names htdf))]
-               [tests     (get-function-tests fn-name)])
-          (check-tests-argument-thoroughness fn-name tests (list 'p ...) (list `check ...))))]))
+
 
 (define-syntax (grade-argument-thoroughness stx)
   (syntax-case stx (all-args per-args)
     [(_ lop
-        (all-args (paa)   aacheck ...)
-        (per-args (p ...) check ...))
-     #'(begin
-         (assert-context--@htdf)
-         (let* ([htdf      (car (context))]
-                [fn-name   (car (htdf-names htdf))]
-                [tests     (get-function-tests fn-name)])
-           (check-argument-thoroughness fn-name tests 'lop 'paa (list `aacheck ...) (list 'p ...) (list `check ...))))]
-    [(_ lop (all-args (paa ...) aacheck ...))
-     #'(grade-argument-thoroughness lop (all-args (paa ...) aacheck ...) (per-args (_)              ))]
-    [(_ lop (per-args (p ...) check ...))
-     #'(grade-argument-thoroughness lop (all-args (_)                  ) (per-args (p ...) check ...))]
+        (all-args (aaparam)     aacheck ...)
+        (per-args (paparam ...)   check ...))
+     #'(grade-argument-thoroughness* `lop `aaparam (list `aacheck ...) (list `paparam ...) (list `check ...))]
+    
+    [(_ lop
+        (all-args (aaparam) aacheck ...))
+     #'(grade-argument-thoroughness lop (all-args (aaparam) aacheck ...) (per-args (_)              ))]
+    [(_ lop (per-args (paparam ...) pacheck ...))
+     #'(grade-argument-thoroughness lop (all-args (_)                  ) (per-args (paparam ...) pacheck ...))]
     [(_ lop)
      #'(grade-argument-thoroughness lop (all-args (_)                  ) (per-args (_)              ))]))
+
+(define (grade-argument-thoroughness* lop aaparam aachecks paparams pachecks)
+  (assert-context--@htdf)
+  (let* ([htdf      (car (context))]
+         [fn-name   (car (htdf-names htdf))]
+         [tests     (get-function-tests fn-name)])
+    (check-argument-thoroughness fn-name tests lop aaparam aachecks paparams pachecks)))
+
+                                      
+;deprecated
+(define-syntax (grade-tests-argument-thoroughness stx)
+  (syntax-case stx ()
+    [(_ (p ...) check ...)
+     #'(grade-argument-thoroughness () (per-args (p ...) check ...))]))
 
 
 (define-syntax (grade-thoroughness-by-faulty-functions stx)
@@ -523,7 +527,7 @@ validity, and test thoroughness results are reported. No grade information is re
 
 (define (check-tests fn-name tests min topic Camel lower)
   (cond [(< (length tests) min) (score-it topic 1 0 #f "~a tests: incorrect - at least ~a test~a required." Camel min (plural min))]
-        [(= (length tests) 0)   (score-it topic 1 1 #f "~a tests: correct." Camel)] ;why a grader would allow this is unclear
+        [(= (length tests) 0)   (score-it topic 1 1 #f "~a tests: correct." Camel)]
         [else
          (let* ([results (map eval-test tests)]
                 [ntests (length tests)]
@@ -635,36 +639,26 @@ validity, and test thoroughness results are reported. No grade information is re
                      (andmap (lambda (x) (equal? x (car args-at-p))) (cdr args-at-p))))
                  (sequence->list (in-range nargs))))))
 
-(define (check-tests-argument-thoroughness fn-name tests paparams pachecks)
-  (check-argument-thoroughness fn-name tests '() '_ '() paparams pachecks))
 
-                     
-(define (check-thoroughness fn-name tests all-defs)
+
+(define (check-thoroughness fn-name tests defns)
   (cond [(= (length tests) 0) (score-it 'test-thoroughness 1 0 #f "Test thoroughness (known fault detection): incorrect - at least 1 test is required.")]
         [else
-         (let* ([nfuns (length all-defs)]
-                ;; a list of lists, one for each faulty function, each sublist is
-                ;; (list true|false|error) meaning passed|failed|erred
-                [results
-                 (for/list ([def all-defs])
-                   (let* ([new-fn-name (gensym)]
-                          [new-tests  (subst new-fn-name fn-name tests)]       ;old-fashioned hygiene
-                          [new-header (cons new-fn-name (cdadr def))]
-                          [new-body   (subst new-fn-name fn-name (caddr def))]
-                          [new-def    `(define ,new-header
-                                         (local [(define ,new-header ,new-body)]
-                                           ,new-header))])
-                     (with-handlers ([exn:fail? (lambda (e) '())])
-                       (calling-evaluator #f new-def)        
-                       (map eval-test new-tests))))]
-                [ndetected (count (curry member #f) results)]
-                [nerr      (count (curry eqv? 'error) (car results))]
-                [%         (/ (max 0 (- ndetected nerr)) nfuns)])
-           
-           (cond [(= % 1)              (score-it 'test-thoroughness 1 % #f "Test thoroughness (known fault detection): correct.")]
-                 [(zero? nerr)         (score-it 'test-thoroughness 1 % #f "Test thoroughness (known fault detection): incorrect - failed to detect known likely faults.")]
-                 [(= nfuns ndetected)  (score-it 'test-thoroughness 1 % #f "Test thoroughness (known fault detection): incorrect - one or more tests caused an error.")]
-                 [else                 (score-it 'test-thoroughness 1 % #f "Test thoroughness (known fault detection): incorrect - failed to detect known likely faults and one or more tests caused an error.")]))]))
+         (let ([xformed-tests (map xform-test tests)])
+           (with-handlers ([exn:fail? (lambda (e) (score-it 'test-thoroughness 1 0 #f "Test thoroughness (known fault detection): incorrect - one or more tests caused an error."))])
+             (let ([results
+                    ;; build the code for all faulty functions together
+                    ;; so that we only cross into the sandbox once
+                    (calling-evaluator #f
+                                       `(list
+                                         ,@(for/list ([defn defns])
+                                             `(local [,defn]
+                                                (not (and ,@xformed-tests))))))]) ;true if at least one test fails
+
+
+               (if (andmap identity results)
+                   (score-it 'test-thoroughness 1 1 #f "Test thoroughness (known fault detection): correct.")
+                   (score-it 'test-thoroughness 1 (/ (count identity results) (length defns)) #f "Test thoroughness (known fault detection): incorrect - failed to detect known likely faults.")))))]))
 
 
 ;; -> (list (list <arg0> ... <result) ...) <number-of-errors>
@@ -1150,23 +1144,53 @@ validity, and test thoroughness results are reported. No grade information is re
 
 
 
-
-
 ;; -> true | false | error
 (define (eval-test test-expr)
   (with-handlers ([exn:fail? (lambda (e) 'error)])
-    (cond [(and (pair? test-expr) (eq? (car test-expr) 'check-expect))
-           (equal? (calling-evaluator #t (cadr test-expr))
-                   (calling-evaluator #t (caddr test-expr)))]
-          [(and (pair? test-expr) (eq? (car test-expr) 'check-member))
-           (and (member (calling-evaluator #t (cadr test-expr))
-                        (calling-evaluator #t (caddr test-expr)))
-                true)]
-          [(and (pair? test-expr) (eq? (car test-expr) 'check-within))
-           (<= (magnitude (- (calling-evaluator #t (cadr test-expr))
-                             (calling-evaluator #t (caddr test-expr))))
-               (calling-evaluator #t (cadddr test-expr)))]
-          [(and (pair? test-expr) (eq? (car test-expr) 'check-random))
+    (case (car test-expr)
+      [(check-expect)     (equal? (calling-evaluator #t (cadr test-expr))
+                                  (calling-evaluator #t (caddr test-expr)))]
+      [(check-member)     (and (member (calling-evaluator #t (cadr test-expr))
+                                       (calling-evaluator #t (caddr test-expr)))
+                               #t)]
+      [(check-equal-sets) (equal-sets? (calling-evaluator #t (cadr test-expr))
+                                       (calling-evaluator #t (caddr test-expr)))]
+      
+      [(check-within)     (<= (magnitude (- (calling-evaluator #t (cadr test-expr))
+                                            (calling-evaluator #t (caddr test-expr))))
+                              (calling-evaluator #t (cadddr test-expr)))]
+      [(check-satisfied)  (and (calling-evaluator #t `(,(caddr test-expr) ,(cadr test-expr)))
+                               true)]
+      
+      [(check-random)
+       (let ([rng (make-pseudo-random-generator)]
+             [k (modulo (current-milliseconds) (sub1 (expt 2 31)))])
+         (equal? (begin (call-in-sandbox-context (evaluator)
+                                                 (thunk (current-pseudo-random-generator rng)
+                                                        (random-seed k)))
+                        (calling-evaluator #t (cadr test-expr)))
+                 (begin (call-in-sandbox-context (evaluator)
+                                                 (thunk (current-pseudo-random-generator rng)
+                                                        (random-seed k)))
+                        (calling-evaluator #t (caddr test-expr)))))]
+
+      [else
+       (let ([result (calling-evaluator #t test-expr)])
+         (if (boolean? result)
+             result
+             true))])))
+
+(define (xform-test test-expr)
+  (if (pair? test-expr)
+      (case (car test-expr)
+        [(check-expect)     `(equal?  ,@(cdr test-expr))]
+        [(check-member)     `(member? ,@(cdr test-expr))]
+        [(check-equal-sets) `(equal-sets? ,(cdr test-expr))]
+        
+        [(check-within)     `(<= (magnitude (- ,(cadr test-expr) (caddr test-expr))) (cadddr ,test-expr))]
+        [(check-satisfied)  `(,(caddr test-expr) ,(cadr test-expr))]
+        #;
+        [(and (pair? test-expr) (eq? (car test-expr) 'check-random))
            (let ([rng (make-pseudo-random-generator)]
                  [k (modulo (current-milliseconds) (sub1 (expt 2 31)))])
              (equal? (begin (call-in-sandbox-context (evaluator)
@@ -1177,21 +1201,8 @@ validity, and test thoroughness results are reported. No grade information is re
                                                      (thunk (current-pseudo-random-generator rng)
                                                             (random-seed k)))
                             (calling-evaluator #t (caddr test-expr)))))]
-          [(and (pair? test-expr) (eq? (car test-expr) 'check-equal-sets))
-           (and (equal-sets? (calling-evaluator #t (cadr test-expr))
-                             (calling-evaluator #t (caddr test-expr)))
-                true)]
-          [(and (pair? test-expr) (eq? (car test-expr) 'check-satisfied))     ;test checked in the sandbox
-           (and (calling-evaluator #t `(,(caddr test-expr) ,(cadr test-expr)))
-                true)]
-          [(and (pair? test-expr) (eq? (car test-expr) 'check-satisfied*))   ;test checked in racket
-           (and ((eval (caddr test-expr)) (calling-evaluator #t (cadr test-expr)))
-                true)]
-          [else
-           (let ([result (calling-evaluator #t test-expr)])
-             (if (boolean? result)
-                 result
-                 true))])))
+        [else test-expr])
+      test-expr))
 
 
 ;; Produce t/f if evaluatable w/o errors.
