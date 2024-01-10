@@ -39,8 +39,8 @@
 
 ;; these affect production of score
 
-(define evaluator (make-parameter #f)) ;the submission evaluator
-(define logger    (make-parameter #f)) ;logger for internal errors (goes to staff)
+(define evaluator (make-parameter (lambda (x) (error "No sandbox evaluator setup yet."))))
+(define logger    (make-parameter (lambda (x) (error "No grading logger setup yet."))))
 (define elts      (make-parameter #f)) ;(listof Elt) the dom for the submission file
 (define context   (make-parameter #f)) ;(listof tag) tag context stack, ie. ((@htdf foo) (@problem 1))
 
