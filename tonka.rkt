@@ -1,6 +1,7 @@
 #lang racket/base
 
-(provide %%eval-test-args-and-results
+(provide %%eval-tests
+         %%eval-test-args-and-results
          %%check-validity
          %%check-thoroughness)
 
@@ -11,6 +12,12 @@
 ;; an observable effect on performance, but even if not, it's a plus in terms of
 ;; simplifying the runtime architecture of the grader.
 ;;
+
+;; (listof (_ -> (listof Any))) -> (listof (listof Any)|'error)
+(define (%%eval-tests thunks)
+  (for/list ([thunk thunks])
+    (with-handlers ([exn:fail? (lambda (e) 'error)])
+      (thunk (void)))))
 
 
 ;; (listof (_ -> (listof Any))) -> (listof (listof Any)|'error)

@@ -529,15 +529,30 @@ validity, and test thoroughness results are reported. No grade information is re
   (cond [(< (length tests) min) (score-it topic 1 0 #f "~a tests: incorrect - at least ~a test~a required." Camel min (plural min))]
         [(= (length tests) 0)   (score-it topic 1 1 #f "~a tests: correct." Camel)]
         [else
-         (let* ([results (map eval-test tests)]
+         (let* ([names (map (lambda (x) (gensym)) tests)]
+                [results
+                 (calling-evaluator #f
+                   `(%%eval-tests
+                     (local ,(for/list ([name names]
+                                        [test tests])
+                               `(define (,name _) ,(xform-test test)))
+                       (list ,@names))))]
+                
+                [lo-result (filter (lambda (r) (boolean? r)) results)]
+                [lo-error  (filter (curry eqv? 'error)       results)]
+
                 [ntests (length tests)]
-                [npass  (count (curry eqv? #t)     results)]
-                [nerror (count (curry eqv? 'error) results)]
+                [nerror (length lo-error)]
+                [npass  (length (filter (lambda (x) (not (false? x))) lo-result))]
+                [nfail  (- ntests nerror npass)]
                 [%      (/ npass ntests)])
            (cond [(= npass ntests)   (score-it topic 1 1 #f "~a tests: correct." Camel)]
                  [(= npass nerror 0) (score-it topic 1 0 #f "~a tests: incorrect - all ~a tests failed." Camel lower)]
-                 [(=       nerror 0) (score-it topic 1 % #f "~a tests: incorrect - ~a ~a tests failed." Camel (- ntests npass) lower)]
-                 [else               (score-it topic 1 % #f "~a tests: incorrect - ~a ~a tests failed, and ~a caused errors." Camel (- ntests npass nerror) lower nerror)]))]))
+                 [(=       nerror 0) (score-it topic 1 % #f "~a tests: incorrect - ~a failed."
+                                               Camel (pluralize nfail (format "~a test" lower)))]
+                 [else               (score-it topic 1 % #f "~a tests: incorrect - ~a failed, and ~a caused an error." Camel
+                                               (pluralize (- ntests npass nerror) (format "~a test" lower))
+                                               (pluralize nerror (format "~a test" lower)))]))]))
 
 
 ;; rename to check-validity !!!
