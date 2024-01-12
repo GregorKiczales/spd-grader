@@ -8,6 +8,7 @@
          "defs.rkt"
          "reloadable.rkt"
          "sandbox.rkt"
+         "file-structure.rkt"
          "score.rkt"
          "utils.rkt"
          "walker.rkt")
@@ -16,6 +17,7 @@
          (except-out (all-from-out "defs.rkt") 
                      CURRENT-TERM
                      GRADERS-DIR)
+         (all-from-out "file-structure.rkt")
          (all-from-out "score.rkt"))
 
 
@@ -78,9 +80,6 @@
 ;; One additional kind of error exists to allow writing (ensure (test x) "...") inside of graders.
 ;; These are represented as exn:fail:ensure-violation and are handled in grade-problem.
 ;;
-(struct exn:fail:student-error    exn:fail:user ())         ;student errors like missing tags
-(struct exn:fail:ensure-violation exn:fail:user ())         ;student errors like changing tests or signatures
-(struct exn:fail:eval-error       exn:fail:user (student?)) ;error evaluating teaching language code student? false if grader code
 
 (define-syntax (per-problem-error-handling stx) ;used in grade-problem 
   (syntax-case stx ()
@@ -112,8 +111,6 @@
          ((evaluator) exp))]))
 
 
-(define (raise-student-error msg . v)
-  (raise (exn:fail:student-error  (apply format msg v) (current-continuation-marks))))
 
 
 (define (ensure tst fmt-ctl . fmt-args)
@@ -445,38 +442,41 @@ validity, and test thoroughness results are reported. No grade information is re
 
 (define-syntax (grade-submitted-tests stx)
   (syntax-case stx ()
-    [(_)       #'(grade-submitted-tests 1 0)]
-    [(_   min) #'(grade-submitted-tests 1 min)]
-    [(_ n min)
-     #'(begin 
-         (assert-context--@htdf)
-        ;(check-bounds n (length (htdf-names (car (context)))) "function definition")
-         (let* ([htdf    (car (context))]
-		[fn-name (if (symbol? n) n (list-ref (htdf-names htdf) (sub1 n)))]
-                [tests (get-function-tests fn-name)])
-           (check-submitted-tests fn-name tests)))]))
+    [(_)       #'(grade-submitted-tests*  1 0)]
+    [(_   min) #'(grade-submitted-tests*  1 `min)]
+    [(_ n min) #'(grade-submitted-tests* `n `min)]))
+
+(define (grade-submitted-tests* n min)
+  (assert-context--@htdf)
+  ;(check-bounds n (length (htdf-names (car (context)))) "function definition")
+  (let* ([htdf    (car (context))]
+         [fn-name (if (symbol? n) n (list-ref (htdf-names htdf) (sub1 n)))]
+         [tests (get-function-tests fn-name)])
+    (check-submitted-tests fn-name tests)))
                                    
 
 (define-syntax (grade-additional-tests stx)
   (syntax-case stx ()
     [(_ n test ...)
-     #'(begin 
-         (assert-context--@htdf)
-         (let* ([htdf    (car (context))]
-		[fn-name (if (symbol? n) n (list-ref (htdf-names htdf) (sub1 n)))])
-           (check-additional-tests fn-name `(test ...))))]))
+     #'(grade-additional-tests* `n `(test ...))]))
+
+(define (grade-additional-tests* n tests)
+  (let* ([htdf    (car (context))]
+         [fn-name (if (symbol? n) n (list-ref (htdf-names htdf) (sub1 n)))])
+    (check-additional-tests fn-name tests)))
 
 
 (define-syntax (grade-tests-validity stx)
   (syntax-case stx ()
     [(_ (p ...) r check ...)
-     #'(begin
-         (assert-context--@htdf)
-         (let* ([htdf    (car (context))]
-                [fn-name (list-ref (htdf-names htdf) 0)]
-                [tests   (get-function-tests fn-name)])
-           (check-tests-validity fn-name tests (append (list 'p ...) (list 'r)) `(check ...))))]))
+     #'(grade-tests-validity* (list `p ... `r) `(check ...))]))
 
+(define (grade-tests-validity* params checks)
+  (assert-context--@htdf)
+  (let* ([htdf    (car (context))]
+         [fn-name (list-ref (htdf-names htdf) 0)]
+         [tests   (get-function-tests fn-name)])
+    (check-validity fn-name tests params checks)))
 
 
 (define-syntax (grade-argument-thoroughness stx)
@@ -511,17 +511,16 @@ validity, and test thoroughness results are reported. No grade information is re
 
 (define-syntax (grade-thoroughness-by-faulty-functions stx)
   (syntax-case stx ()
-    [(_ n defn ...)
-     #'(begin
-         (assert-context--@htdf)
-         (let* ([htdf      (car (context))]
-                [fn-name   (car (htdf-names htdf))]
-                [tests     (get-function-tests fn-name)])
-           (check-thoroughness fn-name tests (list `defn ...))))]))
+    [(_ n defn ...) #'(grade-thoroughness-by-faulty-functions* `n (list `defn ...))]))
+
+(define (grade-thoroughness-by-faulty-functions* n defns)
+  (assert-context--@htdf)
+  (let* ([htdf      (car (context))]
+         [fn-name   (car (htdf-names htdf))]
+         [tests     (get-function-tests fn-name)])
+    (check-faulty-functions fn-name tests defns)))
 
 
-
-;; fn-name is passed for consistency w/ other check*test* fns
 (define (check-submitted-tests  fn-name tests) (check-tests fn-name tests 2 'submitted-tests  "Submitted"  "submitted"))
 (define (check-additional-tests fn-name tests) (check-tests fn-name tests 0 'additional-tests "Additional" "autograder additional"))
 
@@ -532,107 +531,105 @@ validity, and test thoroughness results are reported. No grade information is re
          (let* ([names (map (lambda (x) (gensym)) tests)]
                 [results
                  (calling-evaluator #f
-                   `(%%eval-tests
+                   `(%%call-thunks-with-handler
                      (local ,(for/list ([name names]
                                         [test tests])
                                `(define (,name _) ,(xform-test test)))
                        (list ,@names))))]
                 
-                [lo-result (filter (lambda (r) (boolean? r)) results)]
-                [lo-error  (filter (curry eqv? 'error)       results)]
 
                 [ntests (length tests)]
-                [nerror (length lo-error)]
-                [npass  (length (filter (lambda (x) (not (false? x))) lo-result))]
-                [nfail  (- ntests nerror npass)]
-                [%      (/ npass ntests)])
+                [npass  (count (lambda (x) (eqv? x #t)) results)]
+                [nfail  (count (lambda (x) (eqv? x #f)) results)]
+                [nerror (count (lambda (x) (eqv? x 'error)) results)]
+                
+                [%      (/ (- npass nerror) ntests)])
+           
            (cond [(= npass ntests)   (score-it topic 1 1 #f "~a tests: correct." Camel)]
-                 [(= npass nerror 0) (score-it topic 1 0 #f "~a tests: incorrect - all ~a tests failed." Camel lower)]
-                 [(=       nerror 0) (score-it topic 1 % #f "~a tests: incorrect - ~a failed."
-                                               Camel (pluralize nfail (format "~a test" lower)))]
-                 [else               (score-it topic 1 % #f "~a tests: incorrect - ~a failed, and ~a caused an error." Camel
+                 [(= nfail ntests)   (score-it topic 1 0 #f "~a tests: incorrect - all ~a tests failed." Camel lower)]
+                 [(=       nerror 0) (score-it topic 1 % #f "~a tests: incorrect - ~a failed." Camel
+                                               (pluralize nfail (format "~a test" lower)))]
+                 [else               (score-it topic 1 % #f "~a tests: incorrect - ~a failed and ~a caused an error." Camel
                                                (pluralize (- ntests npass nerror) (format "~a test" lower))
                                                (pluralize nerror (format "~a test" lower)))]))]))
 
 
-;; rename to check-validity !!!
-(define (check-tests-validity fn-name tests params checks)
-  (let ([ce-s (filter check-expect? tests)])
-    (cond [(= (length ce-s) 0) (score-it 'test-validity 1 0 #f "Test validity (matches problem statement): incorrect - at least 1 test is required.")]
-          [else 
-           (let* ([lo-args-and-result  (get-lo-args-and-result fn-name ce-s)]
-                  [lo-args-with-result (map (lambda (2-list) (append (car 2-list) (cdr 2-list)))
-                                            (filter pair? lo-args-and-result))]
-                  [lo-error            (filter (curry eqv? 'error) lo-args-and-result)]
-                  [checker-names  (map (lambda (c) (gensym "check")) checks)]
+(define (check-validity fn-name tests params checks)
+  (cond [(= (length tests) 0) (score-it 'test-validity 1 0 #f "Test validity (matches problem statement): incorrect - at least 1 test is required.")]
+        [else 
+         (let* ([tests         (filter not-check-satisfied? tests)]
+                [test-names    (map (lambda (x) (gensym "test")) tests)]
+                [criteria-names (map (lambda (x) (gensym "cond"))  checks)]         
                   
-                  [fails 
-                   (calling-evaluator #f
-                    `(%%check-validity ',lo-args-with-result
-                                       ',checker-names
-                                       (local ,(for/list ([name checker-names]
-                                                          [check checks])
-                                                 `(define (,name ,@params) ,check))
-                                         (list ,@checker-names))))]
+                [results
+                 (calling-evaluator #f
+                  `(local [,@(for/list ([c    tests]
+                                        [name test-names])
+                               `(define (,name _)
+                                  (list ,(subst 'list fn-name (cadr c)) ;...trying to make local work with 1985 hygiene !!! do it right w/ walker
+                                        ,(caddr c))))
 
-                  [ntests (length ce-s)]
-                  [nerror (length lo-error)]
-                  [nfail  (length fails)]
-                  [npass  (- ntests nfail nerror)]
-                  
-                  [% (/ (max 0 npass) ntests)])
-        
+                           (define (%%all-checks ,@params)
+                             (and ,@checks))]
+                     
+                     (%%check-validity (list ,@test-names) %%all-checks)))]
+
+                [ntests (length tests)]
+                [npass  (count (lambda (x) (eqv? x #t)) results)]
+                [nfail  (count (lambda (x) (eqv? x #f)) results)]
+                [nerror (count (lambda (x) (eqv? x 'error)) results)]
+
+                [% (/ npass ntests)])
+
              (cond [(= % 1)        (score-it 'test-validity 1 1 #f "Test validity (matches problem statement): correct.")]
                    [(zero? nerror) (score-it 'test-validity 1 % #f "Test validity (matches problem statement): incorrect - ~a of ~a tests is invalid." nfail ntests)]
-                   [(empty? fails) (score-it 'test-validity 1 % #f "Test validity (matches problem statement): incorrect - ~a of ~a tests caused an error." nerror ntests)]
-                   [else           (score-it 'test-validity 1 % #f "Test validity (matches problem statement): incorrect - ~a of ~a tests is invalid, and ~a caused an error." nfail ntests (pluralize nerror "test"))]))])))
+                   [(zero? nfail)  (score-it 'test-validity 1 % #f "Test validity (matches problem statement): incorrect - ~a of ~a tests caused an error." nerror ntests)]
+                   [else           (score-it 'test-validity 1 % #f "Test validity (matches problem statement): incorrect - ~a of ~a tests is invalid, and ~a caused an error." nfail ntests (pluralize nerror "test"))]))]))
 
-(define (check-argument-thoroughness fn-name tests lop aa-param aa-checks pa-params pa-checks) '()
-  (let ([ce-s (filter check-expect? tests)])
-    (cond [(= (length ce-s) 0) (score-it 'test-thoroughness 1 0 #f "Test thoroughness (test argument coverage): incorrect - at least 1 test is required.")]
-          [else
-           (let* ([lo-args-and-result  (get-lo-args-and-result fn-name ce-s)]
-                  [lo-args  (map car (filter pair? lo-args-and-result))]
-                  [lo-error          (filter (curry eqv? 'error) lo-args-and-result)]
+(define (check-argument-thoroughness fn-name tests lop aa-param aa-checks pa-params pa-checks)
+  (cond [(= (length tests) 0) (score-it 'test-thoroughness 1 0 #f "Test thoroughness (test argument coverage): incorrect - at least 1 test is required.")]
+        [else
+         (let* ([tests (filter not-check-satisfied? tests)]
+                [lo-args-and-result  (get-lo-args-and-result fn-name tests)]
+                [lo-args  (map car (filter pair? lo-args-and-result))]
                  
-                  [aa-check-names (map (lambda (x) (gensym)) aa-checks)]   ; (take check-numbers (length aa-checks))]
-                  [pa-check-names (map (lambda (x) (gensym)) pa-checks)]  ; [pa-check-numbers (drop check-numbers (length aa-checks))]
+                [aa-check-names (map (lambda (x) (gensym)) aa-checks)] ; (take check-numbers (length aa-checks))]
+                [pa-check-names (map (lambda (x) (gensym)) pa-checks)] ; [pa-check-numbers (drop check-numbers (length aa-checks))]
                  
-                  [equal-positions (filter (lambda (p) (not (member p lop))) (test-args-equal-positions lo-args))])
+                [equal-positions (filter (lambda (p) (not (member p lop))) (test-args-equal-positions lo-args))])
              
-             (if (not (null? equal-positions))
-                 (score #f 'test-thoroughness 1 0
-                        '()
-                        (cons (message #f "Test thoroughness (test argument coverage): incorrect -")
-                              (for/list ([p equal-positions])
-                                (message #f " In every test the value of argument ~a is the same." p))))
-
-                 (let* ([passes
-                         (calling-evaluator #f
-                           `(%%check-thoroughness ',lo-args
-                                                  ',aa-check-names
-                                                  ',pa-check-names
-                                                  (local ,(for/list ([name aa-check-names]
-                                                                     [check aa-checks])
-                                                            `(define (,name ,aa-param) ,check))
-                                                    (list ,@aa-check-names))
-                                                  (local ,(for/list ([name pa-check-names]
-                                                                     [check pa-checks])
-                                                            `(define (,name ,@pa-params) ,check))
-                                                    (list ,@pa-check-names))))]
-                        
-                        [nchecks (+ (length aa-check-names) (length pa-check-names))]
-                        [nerror  (length lo-error)]
-                        [npass   (length passes)]
-                        [nfail   (- nchecks npass)]
-                        
-                        [% (if (and (null? aa-checks) (null? pa-checks));happens when used to only check non-duplicate args
-                               1
-                               (/ (max 0 (- npass nerror)) nchecks))])
-                     
-                   (cond [(> nerror 0) (score-it 'test-thoroughness 1 0 #f "Test thoroughness (test argument coverage): incorrect - one or more tests caused an error.")]
-                         [(= % 1)      (score-it 'test-thoroughness 1 1 #f "Test thoroughness (test argument coverage): correct.")]
-                         [else         (score-it 'test-thoroughness 1 % #f "Test thoroughness (test argument coverage): incorrect - missing one or more cases.")]))))])))
+           (if (not (null? equal-positions))
+               (score #f 'test-thoroughness 1 0
+                      '()
+                      (cons (message #f "Test thoroughness (test argument coverage): incorrect -")
+                            (for/list ([p equal-positions])
+                              (message #f " In every test the value of argument ~a is the same." p))))
+               
+               (let* ([passes
+                       (calling-evaluator #f
+                         `(%%check-argument-thoroughness ',lo-args
+                                                         ',aa-check-names
+                                                         ',pa-check-names
+                                                         (local ,(for/list ([name aa-check-names]
+                                                                            [check aa-checks])
+                                                                   `(define (,name ,aa-param) ,check))
+                                                           (list ,@aa-check-names))
+                                                         (local ,(for/list ([name pa-check-names]
+                                                                            [check pa-checks])
+                                                                   `(define (,name ,@pa-params) ,check))
+                                                           (list ,@pa-check-names))))]
+                      
+                      [nchecks (+ (length aa-check-names) (length pa-check-names))]
+                      [nerror  (count (lambda (x) (eqv? x 'error)) lo-args-and-result)]
+                      [npass   (length passes)]
+                      
+                      [% (if (and (null? aa-checks) (null? pa-checks));happens when used to only check non-duplicate args
+                             1
+                             (/ (max 0 (- npass nerror)) nchecks))])
+                 
+                 (cond [(> nerror 0) (score-it 'test-thoroughness 1 0 #f "Test thoroughness (test argument coverage): incorrect - one or more tests caused an error.")]
+                       [(= % 1)      (score-it 'test-thoroughness 1 1 #f "Test thoroughness (test argument coverage): correct.")]
+                       [else         (score-it 'test-thoroughness 1 % #f "Test thoroughness (test argument coverage): incorrect - missing one or more cases.")]))))]))
 
 
 (define (test-args-equal-positions lo-args)
@@ -645,41 +642,101 @@ validity, and test thoroughness results are reported. No grade information is re
 
 
 
-(define (check-thoroughness fn-name tests defns)
+(define (check-faulty-functions fn-name tests defns)
   (cond [(= (length tests) 0) (score-it 'test-thoroughness 1 0 #f "Test thoroughness (known fault detection): incorrect - at least 1 test is required.")]
         [else
-         (let ([xformed-tests (map xform-test tests)])
-           (with-handlers ([exn:fail? (lambda (e) (score-it 'test-thoroughness 1 0 #f "Test thoroughness (known fault detection): incorrect - one or more tests caused an error."))])
-             (let ([results
-                    ;; build the code for all faulty functions together
-                    ;; so that we only cross into the sandbox once
-                    (calling-evaluator #f
-                                       `(list
-                                         ,@(for/list ([defn defns])
-                                             `(local [,defn]
-                                                (not (and ,@xformed-tests))))))]) ;true if at least one test fails
-
-
-               (if (andmap identity results)
-                   (score-it 'test-thoroughness 1 1 #f "Test thoroughness (known fault detection): correct.")
-                   (score-it 'test-thoroughness 1 (/ (count identity results) (length defns)) #f "Test thoroughness (known fault detection): incorrect - failed to detect known likely faults.")))))]))
+         (let* ([results
+                 (calling-evaluator #f
+                   `(local [(define (%%all-tests ,fn-name)           ;#t if at least one test fails
+                              (not (and ,@(for/list ([test tests])
+                                            (xform-test test)))))]
+                      (%%check-faulty-functions
+                       %%all-tests
+                       (list ,@(for/list ([defn defns])
+                                 `(local [,defn] ,fn-name))))))]     ;remember we can't use lambda
+                
+                [ndefns    (length defns)]
+                [ndetected (count (lambda (x) (eqv? x #t)) results)]
+                [nmissed   (count (lambda (x) (eqv? x #f)) results)]
+                [nerror    (count (lambda (x) (eqv? x 'error)) results)]
+                
+                [%         (/ ndetected ndefns)])
+           
+           (cond [(= % 1)        (score-it 'test-validity 1 1 #f "Test thoroughness (known fault detection): correct.")]
+                 [(zero? nerror) (score-it 'test-validity 1 % #f "Test thoroughness (known fault detection): incorrect - no submitted test failed for ~a of ~a known faulty functions." nmissed ndefns)]
+                 [else           (score-it 'test-validity 1 % #f "Test thoroughness (known fault detection): incorrect - no submitted test failed for ~a of ~a known faulty functions, and ~a tests caused an error." nmissed ndefns nerror)]))]))
 
 ;; -> (listof (list (listof Any) Any)|'error)
-(define (get-lo-args-and-result fn-name ce-s)
-  (if (empty? ce-s)
-      '()
-      (let ([fn-names (map (lambda (ce) (gensym)) ce-s)])
+(define (get-lo-args-and-result fn-name checks)
+  (let* ([checks   (filter not-check-satisfied? checks)]
+         [fn-names (map (lambda (ce) (gensym)) checks)])
+    (if (empty? checks)
+        '()
         ((evaluator)
-         `(%%eval-test-args-and-results
-           (local ,(for/list ([ce ce-s]
+         `(%%call-thunks-with-handler
+           (local ,(for/list ([c     checks]
                               [fn-nm fn-names])
-                     ;; We may be running in BSL, so no zero-arg
-                     ;; functions and no lambda are allowed.
                      `(define (,fn-nm _)
-                        (list ,(subst 'list fn-name (cadr ce)) ;...trying to make local work with 1985 hygiene !!! do it right w/ walker
-                              ,(caddr ce))))
+                        (list ,(subst 'list fn-name (cadr c)) ;...trying to make local work with 1985 hygiene !!! do it right w/ walker
+                              ,(caddr c))))
              (list ,@fn-names)))))))
 
+(define (xform-test test-expr)
+  (if (pair? test-expr)
+      (case (car test-expr)
+        [(check-expect)     `(equal?        ,@(cdr test-expr))]
+        [(check-member)     `(member?       ,@(cdr test-expr))]
+        [(check-equal-sets) `(%%equal-sets? ,@(cdr test-expr))]
+        
+        [(check-within)     `(<= (magnitude (- ,(cadr test-expr) (caddr test-expr))) (cadddr ,test-expr))]
+        [(check-satisfied)  `(,(caddr test-expr) ,(cadr test-expr))]
+
+        [(check-random)
+         `(local [(define (thunk1 _) ,(cadr  test-expr))
+                  (define (thunk2 _) ,(caddr test-expr))]
+            (%%check-random thunk1 thunk2))]
+        [else test-expr])
+      test-expr))
+
+
+
+
+;; -> true | false | error
+#;
+(define (eval-test test-expr)
+  (with-handlers ([exn:fail? (lambda (e) 'error)])
+    (case (car test-expr)
+      [(check-expect)     (equal? (calling-evaluator #t (cadr test-expr))
+                                  (calling-evaluator #t (caddr test-expr)))]
+      [(check-member)     (and (member (calling-evaluator #t (cadr test-expr))
+                                       (calling-evaluator #t (caddr test-expr)))
+                               #t)]
+      [(check-equal-sets) (equal-sets? (calling-evaluator #t (cadr test-expr))
+                                       (calling-evaluator #t (caddr test-expr)))]
+      
+      [(check-within)     (<= (magnitude (- (calling-evaluator #t (cadr test-expr))
+                                            (calling-evaluator #t (caddr test-expr))))
+                              (calling-evaluator #t (cadddr test-expr)))]
+      [(check-satisfied)  (and (calling-evaluator #t `(,(caddr test-expr) ,(cadr test-expr)))
+                               true)]
+      
+      [(check-random)
+       (let ([rng (make-pseudo-random-generator)]
+             [k (modulo (current-milliseconds) (sub1 (expt 2 31)))])
+         (equal? (begin (call-in-sandbox-context (evaluator)
+                                                 (thunk (current-pseudo-random-generator rng)
+                                                        (random-seed k)))
+                        (calling-evaluator #t (cadr test-expr)))
+                 (begin (call-in-sandbox-context (evaluator)
+                                                 (thunk (current-pseudo-random-generator rng)
+                                                        (random-seed k)))
+                        (calling-evaluator #t (caddr test-expr)))))]
+
+      [else
+       (let ([result (calling-evaluator #t test-expr)])
+         (if (boolean? result)
+             result
+             true))])))
 
 
 
@@ -1011,61 +1068,7 @@ validity, and test thoroughness results are reported. No grade information is re
          [defn   (and (>= (length defns) n) (list-ref defns (sub1 n)))])
     (pair? (caddr defn))))
 
-;; get- utility functions
 
-(define (tag-sexps t)
-  (map elt-sexp (filter (compose (curry member t) elt-tags) (elts))))
-
-
-(define (get-problem* n)
-  (or (get-by-pred (lambda (x) (and (@problem? x) (= n (problem-num x)))))
-      (raise-student-error  "Could not find (@problem ~a)." n)))
-
-
-
-(define (get-htdf* n) (get-by-name-or-index '@htdf @htdf? n (lambda (x) (member n (htdf-names x)))))
-(define (get-htdd* n) (get-by-name-or-index '@htdd @htdd? n (lambda (x) (member n (htdd-names x)))))
-(define (get-htdw* n) (get-by-name-or-index '@htdw @htdw? n (lambda (x) (eqv? n (htdw-ws x)))))
-
-(define (get-by-name-or-index kind type? n name?)
-  (cond [(and (symbol? n)
-	      (eqv? #\$ (string-ref (symbol->string n) 0)))
-	 (or (get-by-pred type?)
-	     (raise-student-error "could not find ~a tag." kind))]
-	[(symbol? n)
-	 (or (get-by-pred (lambda (x) (and (type? x) (name? x))))
-	     (raise-student-error "could not find (~a ~a)." kind n))]
-	[(number? n)
-	 (or (get-by-index type? n)
-	     (raise-student-error "could not find ~a number ~a" kind n))]))
-
-(define (get-by-pred p)
-  (let loop ([sexps (if (null? (context)) (map elt-sexp (elts)) (tag-sexps (car (context))))])
-    (cond [(empty? sexps) #f]
-          [(p (car sexps)) (car sexps)]
-          [else
-           (loop (rest sexps))])))
-
-(define (get-by-index p n)
-  (let loop ([i 0]                        ;!!! below was just (elts)
-	     [sexps (if (null? (context)) (map elt-sexp (elts)) (tag-sexps (car (context))))])
-    (cond [(empty? sexps)                 #f]
-	  [(and (p (car sexps)) (= i n))  (car sexps)]
-	  [     (p (car sexps))           (loop (add1 i) (rest sexps))]
-	  [else                           (loop       i  (rest sexps))])))
-
-(define (get-all-tests)
-  (filter check? (map elt-sexp (elts))))
-
-(define (get-function-tests fn-name)
-  (filter (lambda (t)
-	    (and (check? t)
-		 (let ([test-actual (cadr t)])
-		   (and (pair? test-actual)
-			(or (eqv? (car test-actual) fn-name)
-			    (and (eqv? (car test-actual) 'local)
-				 (eqv? (caaddr test-actual) fn-name)))))))
-	  (map elt-sexp (elts))))
   
 
 
@@ -1142,66 +1145,6 @@ validity, and test thoroughness results are reported. No grade information is re
 
 
 
-;; -> true | false | error
-(define (eval-test test-expr)
-  (with-handlers ([exn:fail? (lambda (e) 'error)])
-    (case (car test-expr)
-      [(check-expect)     (equal? (calling-evaluator #t (cadr test-expr))
-                                  (calling-evaluator #t (caddr test-expr)))]
-      [(check-member)     (and (member (calling-evaluator #t (cadr test-expr))
-                                       (calling-evaluator #t (caddr test-expr)))
-                               #t)]
-      [(check-equal-sets) (equal-sets? (calling-evaluator #t (cadr test-expr))
-                                       (calling-evaluator #t (caddr test-expr)))]
-      
-      [(check-within)     (<= (magnitude (- (calling-evaluator #t (cadr test-expr))
-                                            (calling-evaluator #t (caddr test-expr))))
-                              (calling-evaluator #t (cadddr test-expr)))]
-      [(check-satisfied)  (and (calling-evaluator #t `(,(caddr test-expr) ,(cadr test-expr)))
-                               true)]
-      
-      [(check-random)
-       (let ([rng (make-pseudo-random-generator)]
-             [k (modulo (current-milliseconds) (sub1 (expt 2 31)))])
-         (equal? (begin (call-in-sandbox-context (evaluator)
-                                                 (thunk (current-pseudo-random-generator rng)
-                                                        (random-seed k)))
-                        (calling-evaluator #t (cadr test-expr)))
-                 (begin (call-in-sandbox-context (evaluator)
-                                                 (thunk (current-pseudo-random-generator rng)
-                                                        (random-seed k)))
-                        (calling-evaluator #t (caddr test-expr)))))]
-
-      [else
-       (let ([result (calling-evaluator #t test-expr)])
-         (if (boolean? result)
-             result
-             true))])))
-
-(define (xform-test test-expr)
-  (if (pair? test-expr)
-      (case (car test-expr)
-        [(check-expect)     `(equal?  ,@(cdr test-expr))]
-        [(check-member)     `(member? ,@(cdr test-expr))]
-        [(check-equal-sets) `(equal-sets? ,(cdr test-expr))]
-        
-        [(check-within)     `(<= (magnitude (- ,(cadr test-expr) (caddr test-expr))) (cadddr ,test-expr))]
-        [(check-satisfied)  `(,(caddr test-expr) ,(cadr test-expr))]
-        #;
-        [(and (pair? test-expr) (eq? (car test-expr) 'check-random))
-           (let ([rng (make-pseudo-random-generator)]
-                 [k (modulo (current-milliseconds) (sub1 (expt 2 31)))])
-             (equal? (begin (call-in-sandbox-context (evaluator)
-                                                     (thunk (current-pseudo-random-generator rng)
-                                                            (random-seed k)))
-                            (calling-evaluator #t (cadr test-expr)))
-                     (begin (call-in-sandbox-context (evaluator)
-                                                     (thunk (current-pseudo-random-generator rng)
-                                                            (random-seed k)))
-                            (calling-evaluator #t (caddr test-expr)))))]
-        [else test-expr])
-      test-expr))
-
 
 ;; Produce t/f if evaluatable w/o errors.
 (define (check-evaluatable? expr)
@@ -1212,26 +1155,6 @@ validity, and test thoroughness results are reported. No grade information is re
 
 
 
-;; Helper for check-*
-(define-syntax (rubric stx)
-  (syntax-case stx ()
-    [(_ TOPIC PREFIX [Q V T] ...)
-     #'(rubric TOPIC PREFIX [Q V T] ... [else "correct"])]
-    
-    [(_ TOPIC PREFIX [Q V T] ... [else Te])
-     #'(let* ([max-score (+ V ...)]
-              [items (list (list V (lambda () Q) T) ...)]
-              [applied (filter (lambda (i) (not ((cadr i)))) items)])
-         (if (empty? applied)
-             (score-it 'TOPIC 1 1 #f "~a: ~a." PREFIX Te)
-             (score #f
-                    'TOPIC
-                    1
-                    (/ (- max-score (foldl + 0 (map car applied))) max-score)
-                    '()
-                    (cons (message #f "~a: incorrect." PREFIX); #f Te)
-                          (map (lambda (item) (message #t (format "~a: ~a." PREFIX (caddr item))))
-                               applied)))))]))
 
 
 
@@ -1239,160 +1162,6 @@ validity, and test thoroughness results are reported. No grade information is re
 
 
 ;; !!!!! DOM "utils.rkt"
-
-(define CHECK-FORMS
-  '(check-expect check-random check-satisfied check-within check-error check-member-of check-range))
-
-
-(struct elt (tags sexp) #:transparent)
-
-
-(define (fn->elts fn)
-  (parse-elts (read-sexps fn)))
-
-(define (read-sexps fn)
-  (call-with-input-file fn
-    (lambda (p)
-      (parameterize ([read-accept-reader #t]
-		     [read-case-sensitive #t]
-                     [read-decimal-as-inexact #f] ;to match teaching languages
-		     [current-input-port p])
-	(read-line (current-input-port))
-	(read-line (current-input-port))
-	(read-line (current-input-port))
-	
-	(let loop ([se (read)])
-	  (if (eof-object? se)
-	      '()
-	      (cons (post-read-convert se) (loop (read)))))))))
-
-(define (read-syntaxes fn)
-  (call-with-input-file fn
-    (lambda (p)
-      (parameterize ([read-accept-reader #t]
-		     [read-case-sensitive #t]
-                     [read-decimal-as-inexact #f] ;to match teaching languages
-		     [current-input-port p])
-
-        (cdr (syntax->list (cadddr (syntax->list (read-syntax fn p)))))))))
-  
-
-
-
-
-(define (parse-elts lose)
-  ;;
-  ;; The grade-xxx forms enforce a nesting of graders as follows
-  ;;  grade-problem (must be at top-level)
-  ;;   grade-htdd
-  ;;     grade-dd-rules-and-template
-  ;;     ...
-  ;;   grade-htdf
-  ;;     grade-signature
-  ;;     grade-tests-validity
-  ;;     ...
-  ;;
-  ;; So we parse the appearance of tags in the file as matching that structure.
-  ;;
-  (define (clear-context @t context)
-    (cond [(eq? @t    '@problem)      (remove-all '(@problem @htdf @htdd) context)]
-          [(member @t '(@htdd @htdf)) (remove-all '(@htdd @htdf) context)]
-          [(eq? @t    '@htdw)         (remove-all '(@htdw) context)]))
-
-  (define (remove-all tags context)
-    (cond [(null? context) context]
-          [else
-           (if (and (pair? (car context))
-                    (member (caar context) tags))
-               (remove-all tags (cdr context))
-               (cons (car context)
-                     (remove-all tags (cdr context))))]))
-           
-
-  (let loop ([lose lose]
-	     [context '()])
-    (if (null? lose)
-	'()
-	(let ([sexp (first lose)])
-	  (cond [(and (pair? sexp)
-		      (member (first sexp) '(@problem @htdw @htdd @htdf)))
-		 (let ([new-context (cons sexp (clear-context (first sexp) context))])
-		   (cons (elt (cdr new-context) sexp)
-			 (loop (cdr lose)
-			       new-context)))]
-                [(and (pair? sexp)
-                      (eqv? (first sexp) '@signature))
-                 (cons (elt context (subst 'false #f sexp)) ;!!! make this go away, false is a symbol in this case not a value
-                       (loop (cdr lose)
-                             context))]
-		[else
-		 (cons (elt context sexp)
-		       (loop (cdr lose)
-			     context))])))))
-
-
-
-(define problem-sexps tag-sexps)  ;some tags have elements after them
-(define htdw-sexps    tag-sexps)
-(define htdd-sexps    tag-sexps)
-(define htdf-sexps    tag-sexps)
-
-(define problem-num             cadr)    ;data in the actual tag
-(define htdw-ws                 cadr)   
-(define htdf-names              cdr)    
-(define htdd-names              cdr)
-(define template-origin-origins cdr)
-(define template-defn           cadr)
-(define dd-template-rules-rules cdr)
-
-;; !!! the remove '@signature is because sometimes this is called on the tag and
-;; !!! sometimes it is called on just the signature. sigh.
-(define (signature-args   sig) (takef (remove '@signature sig) (lambda (x) (not (eqv? x '->))))) ;!!!cdr added because sig includes @signature
-(define (signature-result sig) (cadr (member '-> sig)))
-(define (signature-fail?  sig) (equal? (cddr (member '-> sig)) '(or false)))
-
-(define (problem-htdfs         t) (filter @htdf?              (tag-sexps t)))
-
-(define (htdf-sigs             t) (filter @signature?         (tag-sexps t)))
-(define (htdf-checks           t) (filter check?              (tag-sexps t)))
-(define (htdf-template-origins t) (filter @template-origin?   (tag-sexps t)))
-(define (htdf-templates        t) (filter @template?          (tag-sexps t)))
-(define (htdf-defns            t) (filter fn-defn?            (tag-sexps t)))
-
-(define (htdd-constants        t) (filter const-defn?         (tag-sexps t)))
-(define (htdd-rules            t) (filter @dd-template-rules? (tag-sexps t)))
-(define (htdd-templates        t) (filter fn-defn?            (tag-sexps t)))
-
-
-(define (@assignment?          x) (and (pair? x) (eq? (car x) '@assignment)))
-(define (@cwl?                 x) (and (pair? x) (eq? (car x) '@cwl)))
-
-(define (@problem?             x) (and (pair? x) (eq? (car x) '@problem)))
-
-(define (@htdw?                x) (and (pair? x) (eq? (car x) '@htdw)))
-(define (@htdd?                x) (and (pair? x) (eq? (car x) '@htdd)))
-(define (@htdf?                x) (and (pair? x) (eq? (car x) '@htdf)))
-
-(define (@signature?           x) (and (pair? x) (eq? (car x) '@signature)))
-
-(define (@dd-template-rules?   x) (and (pair? x) (eq? (car x) '@dd-template-rules)))
-(define (@template-origin?     x) (and (pair? x) (eq? (car x) '@template-origin)))
-(define (@template?            x) (and (pair? x) (eq? (car x) '@template)))
-
-(define (require?              x) (and (pair? x) (eq?   (car x) 'require)))
-(define (check?                x) (and (pair? x) (member (car x) CHECK-FORMS)))
-(define (fn-defn?              x) (and (pair? x) (eq? (car x) 'define) (pair? (cadr x)) (pair? (cddr x))))
-(define (const-defn?           x) (and (pair? x) (eq? (car x) 'define) (symbol? (cadr x))))
-(define (struct-defn?          x) (and (pair? x) (eq? (car x) 'define-struct)))
-(define (defn?                 x) (or (fn-defn? x) (const-defn? x) (struct-defn? x)))
-
-(define (check-expect?         x) (and (pair? x) (eq? (car x) 'check-expect)))
-
-(define fn-defn-name       caadr)
-(define fn-defn-parameters cdadr)
-(define fn-defn-body       caddr)
-
-
 
 
 
@@ -1426,9 +1195,6 @@ validity, and test thoroughness results are reported. No grade information is re
 
 
 
-
-(define (display-overall-grade n msg rpt)
-  (displayln/f (format "~%~%~%AUTOGRADING GRADE:   ~a    (out of 100)~%~%~a" n msg) rpt))
 
 
 
