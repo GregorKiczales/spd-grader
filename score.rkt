@@ -9,6 +9,7 @@
          message
          score-it
          rubric-item
+         rubric
          
          reduce-it
          
@@ -21,6 +22,7 @@
          score-max
          score-min
          score-*
+         display-overall-grade
          display-score)
 
 ;; Scores
@@ -67,6 +69,27 @@
   (if correct?
       (reduction topic w correct? (message #f "Reduction not applied: ~a." (apply format fmt-ctl fmt-args)))    ;display-score hides these
       (reduction topic w correct? (message #f "Reduction: ~a."             (apply format fmt-ctl fmt-args)))))
+
+
+(define-syntax (rubric stx)
+  (syntax-case stx ()
+    [(_ TOPIC PREFIX [Q V T] ...)
+     #'(rubric TOPIC PREFIX [Q V T] ... [else "correct"])]
+    
+    [(_ TOPIC PREFIX [Q V T] ... [else Te])
+     #'(let* ([max-score (+ V ...)]
+              [items (list (list V (lambda () Q) T) ...)]
+              [applied (filter (lambda (i) (not ((cadr i)))) items)])
+         (if (empty? applied)
+             (score-it 'TOPIC 1 1 #f "~a: ~a." PREFIX Te)
+             (score #f
+                    'TOPIC
+                    1
+                    (/ (- max-score (foldl + 0 (map car applied))) max-score)
+                    '()
+                    (cons (message #f "~a: incorrect." PREFIX); #f Te)
+                          (map (lambda (item) (message #t (format "~a: ~a." PREFIX (caddr item))))
+                               applied)))))]))
 
 
 (define (header text s)
@@ -201,6 +224,9 @@
          (score-subs s)
 	 (score-msgs s)))
 
+
+(define (display-overall-grade n msg rpt)
+  (displayln/f (format "~%~%~%AUTOGRADING GRADE:   ~a    (out of 100)~%~%~a" n msg) rpt))
 
 
 (define (display-score s out internal?)

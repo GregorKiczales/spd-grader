@@ -54,3 +54,12 @@
 ;(define list-abbreviation-enabled (make-parameter #f))
 (define verbose-error-logging?  (make-parameter #t))
 
+
+(struct exn:fail:student-error    exn:fail:user ())         ;student errors like missing tags
+(struct exn:fail:ensure-violation exn:fail:user ())         ;student errors like changing tests or signatures
+(struct exn:fail:eval-error       exn:fail:user (student?)) ;error evaluating teaching language code student? false if grader code
+
+
+(define (raise-student-error msg . v)
+  (raise (exn:fail:student-error  (apply format msg v) (current-continuation-marks))))
+
