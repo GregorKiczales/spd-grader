@@ -43,7 +43,7 @@
            [defs (eval-defs sol-defs)]
            [ndefs (length sol-defs)]
            
-           [sol (steps sol-expr defs)]) ;named like below
+           [sol (print-convert (steps sol-expr defs))]) ;named like below
 
       (ensure (and (>= (length sub) ndefs)
                    (equal? (take sub ndefs) sol-defs))
@@ -52,68 +52,89 @@
                    (equal? (car (drop sub ndefs)) sol-expr))
               "Must not edit, comment out, or move first expression from starter.")
       
-      (header "Stepping problem:"
-        (weights (*)
-          ;; sub(mitted) is (listof expr)  student answer
-          ;; sol(ution)  is (listof expr)  computed steps (resets)
-          ;; possible    is possible marks (resets)
-          ;; correct     is correct marks
-          ;; msgs        is (listof Message) describing each step
-          ;; n           is the step number in sub
-          (let loop ([sub      (cdr (drop sub ndefs))] ;starting expr doesn't count
-                     [sol      (cdr sol)]              ;
-                     [possible (sub1 (length sol))]    ;
-                     [correct  0]
-                     [msgs     '()]
-                     [n        1])
-            (cond [(and (empty? sub) (empty? sol))
-                   (score #f
-                          'eval-etc
-                          1 (/ correct possible)
-                          '()
-                          (if (= correct possible)
-                              '()
-                              (reverse msgs)))]
-                  [(empty? sub)
-                   (loop '()
-                         (cdr sol)
-                         possible
-                         correct
-                         (cons (message #f "skipped solution step:  ~s" (car sol)) msgs)
-                         (add1 n))]
-                  [(empty? sol)
-                   (loop (cdr sub)
-                         '()
-                         possible
-                         correct
-                         (cons (message #f "extra submission step:  ~s" (car sub)) msgs)
-                         (add1 n))]
-                  
-                  [(equal? (car sub) (print-convert (car sol)));!!!
-                   (loop (cdr sub)
-                         (cdr sol)
-                         possible
-                         (add1 correct)
-                         (cons (message #f "correct:  ~s" (car sol)) msgs)
-                         (add1 n))]
-                  [(member (car sub) (cdr sol))
-                   ;; skipping to a later but correct step
-                   (loop sub
-                         (cdr sol)
-                         possible
-                         correct
-                         (cons (message #f "skipped solution step:  ~s" (car sol)) msgs)
-                         n)]
-                  [else
-                   ;; jumping to a new incorrect step
-                   (let* ([nsteps    (steps (car sub) defs)]
-                          [npossible (+ (- possible (length sol)) (length nsteps))])
-                     (loop (cdr sub)
-                           (cdr nsteps)
-                           (max possible npossible)
-                           correct
-                           (cons (message #f "jumped to incorrect new step:  ~s" (car sub)) msgs)
-                           (add1 n)))])))))))
+      ;; sub(mitted) is (listof expr)  student answer
+      ;; sol(ution)  is (listof expr)  computed steps (resets)
+      ;; possible    is possible marks (resets)
+      ;; correct     is correct marks
+      ;; skipped     is number skipped
+      ;; extra       is number extra
+      ;; msgs        is (listof Message) describing each step
+      ;; n           is the step number in sub
+      (let loop ([sub      (cdr (drop sub ndefs))] ;starting expr doesn't count
+                 [sol      (cdr sol)]              ;
+                 [possible (sub1 (length sol))]    ;
+                 [correct  0]
+                 [skipped  0]
+                 [extra    0]
+                 #;#;
+                 [msgs     '()]
+                 [n        1]
+                 )
+        (cond [(and (empty? sub) (empty? sol))
+               (let ([%    (/ correct possible)]
+                     [poss (pluralize possible "correct step")]
+                     [corr (pluralize correct  "correct step")]
+                     [skip (pluralize skipped  "skipped step")]
+                     [extr (pluralize extra    "extra step")])
+                 (cond [(= correct possible) (score-it 'eval-etc 1 % #f "Stepping problem: correct - ~a." corr)]
+                       [(zero? extra)        (score-it 'eval-etc 1 % #f "Stepping problem: incorrect - ~a of ~a, ~a." correct poss skip)]
+                       [(zero? skipped)      (score-it 'eval-etc 1 % #f "Stepping problem: incorrect - ~a of ~a, ~a." correct poss extr)]
+                       [else                 (score-it 'eval-etc 1 % #f "Stepping problem: incorrect - ~a of ~a, ~a, and ~a." correct poss skip extr)]))]
+              [(empty? sub)
+               (loop '()
+                     (cdr sol)
+                     possible
+                     correct
+                     (add1 skipped)
+                     extra
+                     #;#;
+                     (cons (message #f "skipped solution step:  ~s" (car sol)) msgs)
+                     (add1 n))]
+              [(empty? sol)
+               (loop (cdr sub)
+                     '()
+                     possible
+                     correct
+                     skipped
+                     (add1 extra)
+                     #;#;
+                     (cons (message #f "extra submission step:  ~s" (car sub)) msgs)
+                     (add1 n))]
+              
+              [(equal? (car sub) (car sol))
+               (loop (cdr sub)
+                     (cdr sol)
+                     possible
+                     (add1 correct)
+                     skipped
+                     extra
+                     #;#;
+                     (cons (message #f "correct:  ~s" (car sol)) msgs)
+                     (add1 n))]
+              [(member (car sub) (cdr sol))
+               ;; skipping to a later but correct step
+               (loop sub
+                     (member (car sub) (cdr sol)) ;(cdr sol)
+                     possible
+                     correct
+                     (+ skipped (index-of sol (car sub)))
+                     extra
+                     #;#;
+                     (cons (message #f "skipped solution step:  ~s" (car sol)) msgs)
+                     n)]
+              [else
+               ;; jumping to a new incorrect step
+               (let* ([new-steps    (print-convert (steps (car sub) defs))]
+                      [new-possible (+ (- possible (length sol)) (length new-steps))])
+                 (loop (cdr sub)
+                       (cdr new-steps)
+                       (max possible new-possible)
+                       correct
+                       skipped
+                       extra
+                       #;#;
+                       (cons (message #f "jumped to incorrect new step:  ~s" (car sub)) msgs)
+                       (add1 n)))])))))
     
     
     
