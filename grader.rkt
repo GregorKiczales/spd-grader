@@ -521,12 +521,11 @@ validity, and test thoroughness results are reported. No grade information is re
     (check-faulty-functions fn-name tests defns)))
 
 
-(define (check-submitted-tests  fn-name tests) (check-tests fn-name tests 2 'submitted-tests  "Submitted"  "submitted"))
-(define (check-additional-tests fn-name tests) (check-tests fn-name tests 0 'additional-tests "Additional" "autograder additional"))
+(define (check-submitted-tests  fn-name tests) (check-tests fn-name tests 'submitted-tests  "Submitted"  "submitted"))
+(define (check-additional-tests fn-name tests) (check-tests fn-name tests 'additional-tests "Additional" "autograder supplied additional"))
 
-(define (check-tests fn-name tests min topic Camel lower)
-  (cond [(< (length tests) min) (score-it topic 1 0 #f "~a tests: incorrect - at least ~a test~a required." Camel min (plural min))]
-        [(= (length tests) 0)   (score-it topic 1 1 #f "~a tests: correct." Camel)]
+(define (check-tests fn-name tests topic Camel lower)
+  (cond [(< (length tests) 2) (score-it topic 1 0 #f "~a tests: incorrect - at least 2 tests are required." Camel)]
         [else
          (let* ([names (map (lambda (x) (gensym)) tests)]
                 [results
@@ -555,7 +554,7 @@ validity, and test thoroughness results are reported. No grade information is re
 
 
 (define (check-validity fn-name tests params checks)
-  (cond [(= (length tests) 0) (score-it 'test-validity 1 0 #f "Test validity (matches problem statement): incorrect - at least 1 test is required.")]
+  (cond [(< (length tests) 2) (score-it 'test-validity 1 0 #f "Test validity (matches problem statement): incorrect - at least 2 tests are required.")]
         [else 
          (let* ([tests         (filter not-check-satisfied? tests)]
                 [test-names    (map (lambda (x) (gensym "test")) tests)]
@@ -587,7 +586,7 @@ validity, and test thoroughness results are reported. No grade information is re
                    [else           (score-it 'test-validity 1 % #f "Test validity (matches problem statement): incorrect - ~a of ~a tests is invalid, and ~a caused an error." nfail ntests (pluralize nerror "test"))]))]))
 
 (define (check-argument-thoroughness fn-name tests lop aa-param aa-checks pa-params pa-checks)
-  (cond [(= (length tests) 0) (score-it 'test-thoroughness 1 0 #f "Test thoroughness (test argument coverage): incorrect - at least 1 test is required.")]
+  (cond [(< (length tests) 2) (score-it 'test-thoroughness 1 0 #f "Test thoroughness (test argument coverage): incorrect - at least 2 tests are required.")]
         [else
          (let* ([tests (filter not-check-satisfied? tests)]
                 [lo-args-and-result  (get-lo-args-and-result fn-name tests)]
@@ -643,7 +642,7 @@ validity, and test thoroughness results are reported. No grade information is re
 
 
 (define (check-faulty-functions fn-name tests defns)
-  (cond [(= (length tests) 0) (score-it 'test-thoroughness 1 0 #f "Test thoroughness (known fault detection): incorrect - at least 1 test is required.")]
+  (cond [(< (length tests) 2) (score-it 'test-thoroughness 1 0 #f "Test thoroughness (known fault detection): incorrect - at least 2 tests are required.")]
         [else
          (let* ([results
                  (calling-evaluator #f
