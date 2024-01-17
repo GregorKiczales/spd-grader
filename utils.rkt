@@ -135,7 +135,7 @@
           [else (string-append nstr "th")])))
 
 (define (plural n)
-  (if (> n 1) "s" ""))
+  (if (or (= n 0) (> n 1)) "s" ""))
 
 (define (pluralize n str)
   (format "~a ~a~a" n str (plural n)))
