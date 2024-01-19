@@ -8,8 +8,8 @@
          grade-110-starters  grade-110-solutions   ;!!! factor this 110 stuff out of spd
          grade-one)
 
-(define SPD-MATERIALS (build-path (find-system-path 'home-dir) "spd-materials/"))
-(define 110-MATERIALS (build-path (find-system-path 'home-dir) "110-materials/"))
+(define SPD-MATERIALS (build-path (find-system-path 'home-dir) "spd-materials"))
+(define 110-MATERIALS (build-path (find-system-path 'home-dir) "110-materials"))
 (define EXAMS         (build-path 110-MATERIALS "exams/"))
 
 
@@ -22,7 +22,7 @@
 (define (grade-spd-starters   [verbose? #f]) (grade-tree SPD-MATERIALS #rx".*-starter\\.rkt$"  verbose? grade-not-0?))
 (define (grade-spd-solutions  [verbose? #f]) (grade-tree SPD-MATERIALS #rx".*-solution\\.rkt$" verbose? grade-not-1?))
 (define (grade-110-starters   [verbose? #f]) (grade-tree 110-MATERIALS #rx".*-starter\\.rkt$"  verbose? grade-not-0?))
-(define (grade-110-solutions  [verbose? #f]) (grade-tree 110-MATERIALS #rx".*-solution\\.rkt$" verbose? grade-not-0?))
+(define (grade-110-solutions  [verbose? #f]) (grade-tree 110-MATERIALS #rx".*-solution\\.rkt$" verbose? grade-not-1?))
 
 (define (grade-not-1? g) (or (not (number? g)) (not (= g 1.0))))
 (define (grade-not-0? g) (or (not (number? g)) (not (= g 0.0))))
@@ -32,22 +32,13 @@
 
 (define (grade-some regexp [verbose? #f] [warn? grade-not-1?])
   (grade-listof-path (directory-list "." #:build? #t) regexp verbose? warn?))
-#;
-(define (grade-many regexp [verbose? #f])
-  (grade-listof-path (foldr append
-                            '()
-                            (map (lambda (dir)
-                                   (directory-list (build-path MATERIALS dir) #:build? #t))
-                                 '("psets" "lectures" "labs" "bank")))
-                     regexp
-                     verbose?))
 
 
 (define (grade-tree dir regexp [verbose? #f] [warn? grade-not-1?])
   
   (define (find path)
-    (cond [(member (file-or-directory-type path) '(file link)) (list path)]
-          [(member (file-or-directory-type path) '(directory directory-link))
+    (cond [(member (file-or-directory-type path) '(file)) (list path)]
+          [(member (file-or-directory-type path) '(directory directory-link link))
            (foldr append '() (map (lambda (p) (find p)) (directory-list path #:build? #true)))]
           [else '()]))
     
