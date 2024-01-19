@@ -462,8 +462,15 @@ validity, and test thoroughness results are reported. No grade information is re
 
 (define (grade-additional-tests* n tests)
   (let* ([htdf    (car (context))]
-         [fn-name (if (symbol? n) n (list-ref (htdf-names htdf) (sub1 n)))])
-    (check-additional-tests fn-name tests)))
+         [fn-name (if (symbol? n) n (list-ref (htdf-names htdf) (sub1 n)))]
+         [defns   (htdf-defns htdf)]
+         [defn    (and (pair? defns) (car defns))]
+         [body    (and defn (caddr defn))]
+         [stub?   (or (not (list? body))
+                      (equal? body 'empty)
+                      (equal? body '()))])
+    (grade-prerequisite 'additional-tests "additional-tests: function definition must be more than a stub" (not stub?)
+      (check-additional-tests fn-name tests))))
 
 
 (define-syntax (grade-tests-validity stx)
@@ -1229,32 +1236,22 @@ validity, and test thoroughness results are reported. No grade information is re
 (define (find-assignment-tag fn) (let-values ([(assgn-tag cwl-tag) (find-assgn-cwl-tags fn)]) assgn-tag))
 (define (find-cwl-tag        fn) (let-values ([(assgn-tag cwl-tag) (find-assgn-cwl-tags fn)]) cwl-tag))
 
-
-;; CONSTRAINT: file is well-formed with @assignment before @cwl
-;; !!! this is slowing down running the grader over the solution bank because it runs through
-;; !!! entire files looking for cwl tags that aren't there
 (define (find-assgn-cwl-tags fn)
   (with-input-from-file fn
     (lambda ()
-      (let loop [(line (read-line))
-                 (assgn-tag #f)
-                 (cwl-tag   #f)]
-        (cond [(and assgn-tag cwl-tag) (values assgn-tag cwl-tag)]
-              [(eof-object? line)
-               (cond [(not assgn-tag)
-                      (raise-argument-error 'find-assgn-cwl-tags
-                                            "File is missing @assignment tag" fn)]
-                     [(not cwl-tag)
-                      ;; The solution files don't have cwl tags, so we let this by.  Note that
-                      ;; the precondition above means we shouldn't be in this boat anyways.
-                      (values assgn-tag #f)])]
-              [(and (not assgn-tag)
-                    (regexp-match #rx"^\\(@assignment .*\\)" line))
-               (loop (read-line) (read-from-string line) #f)]
-              [(and (not cwl-tag)
-                    (regexp-match #rx"^\\(@cwl .*\\)" line))
-               (values assgn-tag (read-from-string line))]
-              [else
-               (loop (read-line) assgn-tag cwl-tag)])))))
+      (let loop ([line (read-line)]
+                 [assgn-tag #f]
+                 [cwl-tag   #f])
+        (let ([line (and line (string-downcase line))])
+          (cond [(and assgn-tag cwl-tag) (values assgn-tag cwl-tag)]
+                [(eof-object? line)      (values assgn-tag cwl-tag)]
+                [(and (not assgn-tag)
+                      (regexp-match #rx"^\\(@assignment .*\\)" line))
+                 (loop (read-line) (read-from-string line) #f)]
+                [(and (not cwl-tag)
+                      (regexp-match #rx"^\\(@cwl .*\\)" line))
+                 (values assgn-tag (read-from-string line))]
+                [else
+                 (loop (read-line) assgn-tag cwl-tag)]))))))
 
 
