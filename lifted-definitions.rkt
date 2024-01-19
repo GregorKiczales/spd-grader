@@ -14,15 +14,15 @@
 
 (define (check-lifted-definitions defn0 call0 sol-defns)
   (let* ([sexps (problem-sexps (car (context)))]
-         [sexps (and (>= (length sexps) 2)
-                     ;; some problems don't have the starter uncommented in the file
-                     (cond [(and (equal? (car  sexps) defn0)
-                                 (equal? (cadr sexps) call0))
-                            (cddr sexps)]
-                           [(or (equal? (car  sexps) defn0)
-                                (equal? (cadr sexps) call0))
-                            (cdr sexps)]
-                           [else sexps]))])
+         [sexps (cond [(and (>= (length sexps) 2)
+                            (equal? (car  sexps) defn0)
+                            (equal? (cadr sexps) call0))
+                       (cddr sexps)]
+                      [(and (>= (length sexps) 2)
+                            (or (equal? (car sexps) defn0)
+                                (equal? (car sexps) call0)))
+                       (cdr sexps)]
+                      [else sexps])])
 
     (combine-scores
      (weights* 1.0 '(*)
