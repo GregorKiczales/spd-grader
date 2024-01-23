@@ -388,7 +388,7 @@ validity, and test thoroughness results are reported. No grade information is re
              (assert-context--@problem)
              (parameterize ([context (cons (get-htdf* `n) (context))])
                (header (format "~a: " (car (context)))
-                       (let* ([defns (htdf-defns (car (context)))] ;!!!(list '@htdf 'n))]
+                       (let* ([defns (htdf-defns (car (context)))]
                               [n (and (pair? defns) (car defns))])
                          (weights (*) item ...)))))
          
@@ -490,16 +490,15 @@ validity, and test thoroughness results are reported. No grade information is re
   (syntax-case stx (all-args per-args)
     [(_ lop
         (all-args (aaparam)     aacheck ...)
-        (per-args (paparam ...)   check ...))
-     #'(grade-argument-thoroughness* `lop `aaparam (list `aacheck ...) (list `paparam ...) (list `check ...))]
+        (per-args (paparam ...) pacheck ...))
+     #'(grade-argument-thoroughness* `lop `aaparam (list `aacheck ...) (list `paparam ...) (list `pacheck ...))]
     
-    [(_ lop
-        (all-args (aaparam) aacheck ...))
-     #'(grade-argument-thoroughness lop (all-args (aaparam) aacheck ...) (per-args (_)              ))]
+    [(_ lop (all-args (aaparam) aacheck ...))
+     #'(grade-argument-thoroughness lop (all-args (aaparam) aacheck ...) (per-args (_) #t           ))]
     [(_ lop (per-args (paparam ...) pacheck ...))
-     #'(grade-argument-thoroughness lop (all-args (_)                  ) (per-args (paparam ...) pacheck ...))]
+     #'(grade-argument-thoroughness lop (all-args (_) #t               ) (per-args (paparam ...) pacheck ...))]
     [(_ lop)
-     #'(grade-argument-thoroughness lop (all-args (_)                  ) (per-args (_)              ))]))
+     #'(grade-argument-thoroughness lop (all-args (_) #t               ) (per-args (_) #t           ))]))
 
 (define (grade-argument-thoroughness* lop aaparam aachecks paparams pachecks)
   (assert-context--@htdf)
@@ -632,7 +631,7 @@ validity, and test thoroughness results are reported. No grade information is re
                       [% (if (and (null? aa-checks) (null? pa-checks));happens when used to only check non-duplicate args
                              1
                              (/ (max 0 (- npass nerror)) nchecks))])
-                 
+
                  (cond [(> nerror 0) (score-it 'test-thoroughness 1 0 #f "Test thoroughness (test argument coverage): incorrect - one or more tests caused an error.")]
                        [(= % 1)      (score-it 'test-thoroughness 1 1 #f "Test thoroughness (test argument coverage): correct.")]
                        [else         (score-it 'test-thoroughness 1 % #f "Test thoroughness (test argument coverage): incorrect - missing one or more cases.")]))))]))
@@ -1242,16 +1241,17 @@ validity, and test thoroughness results are reported. No grade information is re
       (let loop ([line (read-line)]
                  [assgn-tag #f]
                  [cwl-tag   #f])
-        (let ([line (and line (string-downcase line))])
-          (cond [(and assgn-tag cwl-tag) (values assgn-tag cwl-tag)]
-                [(eof-object? line)      (values assgn-tag cwl-tag)]
-                [(and (not assgn-tag)
-                      (regexp-match #rx"^\\(@assignment .*\\)" line))
-                 (loop (read-line) (read-from-string line) #f)]
-                [(and (not cwl-tag)
-                      (regexp-match #rx"^\\(@cwl .*\\)" line))
-                 (values assgn-tag (read-from-string line))]
-                [else
-                 (loop (read-line) assgn-tag cwl-tag)]))))))
+        (cond [(and assgn-tag cwl-tag) (values assgn-tag cwl-tag)]
+              [(eof-object? line)      (values assgn-tag cwl-tag)]
+              [else
+               (let ([line (string-downcase line)])
+                 (cond [(and (not assgn-tag)
+                             (regexp-match #rx"^\\(@assignment .*\\)" line))
+                        (loop (read-line) (read-from-string line) #f)]
+                       [(and (not cwl-tag)
+                             (regexp-match #rx"^\\(@cwl .*\\)" line))
+                        (loop (read-line) assgn-tag (read-from-string line))]
+                       [else
+                        (loop (read-line) assgn-tag cwl-tag)]))])))))
 
 
