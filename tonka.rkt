@@ -34,12 +34,16 @@
 
 ;; produce names of checks that are satisfied at least once
 (define (%%check-argument-thoroughness lo-args aa-check-names pa-check-names aa-check-thunks pa-check-thunks)
-  (mergeq (check-thoroughness-thunks (list lo-args) aa-check-names aa-check-thunks)
-          (let loop ([lo-args lo-args])
-            (cond [(null? lo-args) '()]
-                  [else
-                   (mergeq (check-thoroughness-thunks (car lo-args) pa-check-names pa-check-thunks)
-                           (loop (cdr lo-args)))]))))
+  (append (if (null? aa-check-names)
+              '()
+              (check-thoroughness-thunks (list lo-args) aa-check-names aa-check-thunks))
+          (if (null? pa-check-names)
+              '()
+              (let loop ([lo-args lo-args])
+                (cond [(null? lo-args) '()]
+                      [else
+                       (mergeq (check-thoroughness-thunks (car lo-args) pa-check-names pa-check-thunks)
+                               (loop (cdr lo-args)))])))))
 
 (define (check-thoroughness-thunks args names thunks)
   (let loop ([names names]

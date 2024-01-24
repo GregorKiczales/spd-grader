@@ -494,11 +494,11 @@ validity, and test thoroughness results are reported. No grade information is re
      #'(grade-argument-thoroughness* `lop `aaparam (list `aacheck ...) (list `paparam ...) (list `pacheck ...))]
     
     [(_ lop (all-args (aaparam) aacheck ...))
-     #'(grade-argument-thoroughness lop (all-args (aaparam) aacheck ...) (per-args (_) #t           ))]
+     #'(grade-argument-thoroughness lop (all-args (aaparam) aacheck ...) (per-args (_)            ))]
     [(_ lop (per-args (paparam ...) pacheck ...))
-     #'(grade-argument-thoroughness lop (all-args (_) #t               ) (per-args (paparam ...) pacheck ...))]
+     #'(grade-argument-thoroughness lop (all-args (_)                  ) (per-args (paparam ...) pacheck ...))]
     [(_ lop)
-     #'(grade-argument-thoroughness lop (all-args (_) #t               ) (per-args (_) #t           ))]))
+     #'(grade-argument-thoroughness lop (all-args (_)                  ) (per-args (_)            ))]))
 
 (define (grade-argument-thoroughness* lop aaparam aachecks paparams pachecks)
   (assert-context--@htdf)
@@ -602,7 +602,7 @@ validity, and test thoroughness results are reported. No grade information is re
                 [pa-check-names (map (lambda (x) (gensym)) pa-checks)] ; [pa-check-numbers (drop check-numbers (length aa-checks))]
                  
                 [equal-positions (filter (lambda (p) (not (member p lop))) (test-args-equal-positions lo-args))])
-             
+           
            (if (not (null? equal-positions))
                (score #f 'test-thoroughness 1 0
                       '()
@@ -614,7 +614,7 @@ validity, and test thoroughness results are reported. No grade information is re
                        (calling-evaluator #f
                          `(%%check-argument-thoroughness ',lo-args
                                                          ',aa-check-names
-                                                         ',pa-check-names
+                                                         ',pa-check-names                                                             
                                                          (local ,(for/list ([name aa-check-names]
                                                                             [check aa-checks])
                                                                    `(define (,name ,aa-param) ,check))

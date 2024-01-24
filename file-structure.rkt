@@ -12,8 +12,13 @@
 
 
 
-(define (tag-sexps t)
-  (map elt-sexp (filter (compose (curry member t) elt-tags) (elts))))
+(define (get-defns)
+  (htdf-defns (car (context))))
+
+(define (get-defn)
+  (let ([defns (get-defns)])
+    (and (pair? defns) (car defns))))
+
 
 
 (define (get-problem* n)
@@ -21,6 +26,8 @@
       (raise-student-error  "Could not find (@problem ~a)." n)))
 
 
+(define (tag-sexps t)
+  (map elt-sexp (filter (compose (curry member t) elt-tags) (elts))))
 
 (define (get-htdf* n) (get-by-name-or-index '@htdf @htdf? n (lambda (x) (member n (htdf-names x)))))
 (define (get-htdd* n) (get-by-name-or-index '@htdd @htdd? n (lambda (x) (member n (htdd-names x)))))
