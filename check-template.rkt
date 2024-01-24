@@ -170,7 +170,7 @@
                  [else
                   (let ([defn (list-ref templates (sub1 n))])
                     (check-dd-template 'type defn))])))]))
-
+#;#;#;
 (define-syntax (grade-template stx)
   (syntax-case stx (define)
     [(_ . x ) #'(its-all-good-template)]))
@@ -178,8 +178,6 @@
 (define-syntax (grade-exact-template stx)
   (syntax-case stx (define)
     [(_ . x) #'(its-all-good-template)]))
-
-
 
 (define (its-all-good-template)
   (let* ([htdf      (car (context))]
@@ -190,7 +188,6 @@
                  (and template (pair? (cadr template)) (eqv? (caadr template) 'define))
                  "Template appears inside @template")))
 
-#;#;
 (define-syntax (grade-template stx)
   (syntax-case stx (define)
     [(_   (define (fn-for . params) body)) #'(grade-template-from-define 1 'fn-for 'params 'body)]
@@ -554,8 +551,8 @@
   
   
   (define (check-field ft sel subx)
-    (cond [(atomic? ft)
-           ;; !!! this could do an ormap over (params)
+    (cond [(atomic? ft) ;!!! make this allow any order
+           ;; !!! this could do an ormap over (params) 
            (tally (equal? subx `(,sel ,(car (params)))) "selector ~a" subx)]
           [(distinct? ft)
            (tally (or (equal? subx `(,sel ,(car (params))))

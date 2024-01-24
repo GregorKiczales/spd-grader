@@ -103,7 +103,7 @@ Standard directions are:
 
 (define-syntax (grade-questions-intact stx)
   (syntax-case stx ()    
-    [(_ fn-name qa-pair ...)
+    [(_ fn-name (param ...) qa-pair ...)
      #'(let ([what (format "~a - cond questions intact" 'fn-name)])
          (guard-template-fn-grading fn-name 'template-intact what
                                     (rubric-item 'template-intact
@@ -114,6 +114,53 @@ Standard directions are:
                                                              (equal? (map car (cdr cond-expr))
                                                                      (map car '(qa-pair ...))))))
                                                  what)))]))
+
+#;
+(define (check-template-intact* sub0 sol0)
+  ;; walk for equality, except after ... and in cond answers (deal w/ SR later)
+
+  (define sub-params (cdadr sub0))
+  (define sol-params (cdadr sol0))
+  
+  ;; -> #t | #f | ((sol n) ...)
+  ;;              which means true if for every pair we took param sol
+  ;;              in sol-params to be the nth parameter in sub params
+  (define (walk sub sol)
+    (cond [(member sol sol-params) (and (memq sub sub-params)
+                                        (list (list sol (index-of sub-params sub))))]
+	  [(not (pair? sol))       (equal? sub sol)] ;1 2 3 "foo" true...
+          [(not (pair? sub))       #f]
+          [(eqv? (car sol) '...)   #t]
+          [(eqv? (car sol) 'cond)
+           (and (pair? sub)
+                (eqv? (car sub) 'cond)
+                (= (length sub) (length sol))
+                ;; compare questions
+                (walk/l (map car (cdr sub)) (map car (cdr sol))))]
+          [else
+           (walk/l sub sol)]))
+
+  (define (walk/l sub sol)
+    (cond [(and (null? sub) (null? sol)) #t]
+          [(or  (null? sub) (null? sol)) #f]
+          [else
+           (combine-results (walk (car sub) (car sol))
+                            (walk/l (cdr sub) (cdr sol)))]))
+
+  (define (combine-results a b)
+    (cond [(boolean? a) (and a b)]
+          [(boolean? b) (and b a)]
+          [else
+           (let loop ([a a])
+             (cond [(null? a) b]
+                   [else
+                    (let* ([ae (car a)]
+                           [be (assv (car ae) b)])
+                      (cond [(false? be)             (cons ae (loop (cdr a)))]
+                            [(= (cadr ae) (cadr be))          (loop (cdr a))]
+                            [else #f]))]))]))
+
+  (walk sub0 sol0))
 
 
 (define-syntax (grade-accumulator-intact stx) ;!!! make this and similar functions work inside of grade-encapsulated...
