@@ -493,6 +493,11 @@ validity, and test thoroughness results are reported. No grade information is re
         (per-args (paparam ...) pacheck ...))
      #'(grade-argument-thoroughness* `lop `aaparam (list `aacheck ...) (list `paparam ...) (list `pacheck ...))]
     
+    [(_ lop
+        (per-args (paparam ...) pacheck ...)
+        (all-args (aaparam)     aacheck ...))
+     #'(grade-argument-thoroughness* `lop `aaparam (list `aacheck ...) (list `paparam ...) (list `pacheck ...))]
+    
     [(_ lop (all-args (aaparam) aacheck ...))
      #'(grade-argument-thoroughness lop (all-args (aaparam) aacheck ...) (per-args (_)            ))]
     [(_ lop (per-args (paparam ...) pacheck ...))
@@ -598,43 +603,42 @@ validity, and test thoroughness results are reported. No grade information is re
                 [lo-args-and-result  (get-lo-args-and-result fn-name tests)]
                 [lo-args  (map car (filter pair? lo-args-and-result))]
                  
-                [aa-check-names (map (lambda (x) (gensym)) aa-checks)] ; (take check-numbers (length aa-checks))]
-                [pa-check-names (map (lambda (x) (gensym)) pa-checks)] ; [pa-check-numbers (drop check-numbers (length aa-checks))]
-                 
-                [equal-positions (filter (lambda (p) (not (member p lop))) (test-args-equal-positions lo-args))])
-           
-           (if (not (null? equal-positions))
-               (score #f 'test-thoroughness 1 0
-                      '()
-                      (cons (message #f "Test thoroughness (test argument coverage): incorrect -")
-                            (for/list ([p equal-positions])
-                              (message #f " In every test the value of argument ~a is the same." p))))
-               
-               (let* ([passes
-                       (calling-evaluator #f
-                         `(%%check-argument-thoroughness ',lo-args
-                                                         ',aa-check-names
-                                                         ',pa-check-names                                                             
-                                                         (local ,(for/list ([name aa-check-names]
-                                                                            [check aa-checks])
-                                                                   `(define (,name ,aa-param) ,check))
-                                                           (list ,@aa-check-names))
-                                                         (local ,(for/list ([name pa-check-names]
-                                                                            [check pa-checks])
-                                                                   `(define (,name ,@pa-params) ,check))
-                                                           (list ,@pa-check-names))))]
-                      
-                      [nchecks (+ (length aa-check-names) (length pa-check-names))]
-                      [nerror  (count (lambda (x) (eqv? x 'error)) lo-args-and-result)]
-                      [npass   (length passes)]
-                      
-                      [% (if (and (null? aa-checks) (null? pa-checks));happens when used to only check non-duplicate args
-                             1
-                             (/ (max 0 (- npass nerror)) nchecks))])
+                [aa-check-names (map (lambda (x) (gensym)) aa-checks)]
+                [pa-check-names (map (lambda (x) (gensym)) pa-checks)]
 
-                 (cond [(> nerror 0) (score-it 'test-thoroughness 1 0 #f "Test thoroughness (test argument coverage): incorrect - one or more tests caused an error.")]
-                       [(= % 1)      (score-it 'test-thoroughness 1 1 #f "Test thoroughness (test argument coverage): correct.")]
-                       [else         (score-it 'test-thoroughness 1 % #f "Test thoroughness (test argument coverage): incorrect - missing one or more cases.")]))))]))
+                [equal-positions (if (null? lo-args) ;all the tests might have errored
+                                     '()
+                                     (filter (lambda (p) (not (member p lop))) (test-args-equal-positions lo-args)))])
+
+           ;; !!! change equal positions to grade-prerequisite
+           (grade-prerequisite 'test-thoroughness
+               "A set of tests must not have the same argument for any given parameter"
+               (null? equal-positions)               
+             (let* ([passes
+                     (calling-evaluator #f
+                       `(%%check-argument-thoroughness ',lo-args
+                                                       ',aa-check-names
+                                                       ',pa-check-names                                                             
+                                                       (local ,(for/list ([name aa-check-names]
+                                                                          [check aa-checks])
+                                                                 `(define (,name ,aa-param) ,check))
+                                                         (list ,@aa-check-names))
+                                                       (local ,(for/list ([name pa-check-names]
+                                                                          [check pa-checks])
+                                                                 `(define (,name ,@pa-params) ,check))
+                                                         (list ,@pa-check-names))))]
+                    
+                    [nchecks (+ (length aa-check-names) (length pa-check-names))]
+                    [nerror  (count (lambda (x) (eqv? x 'error)) lo-args-and-result)]
+                    [npass   (length passes)]
+                    
+                    [% (if (and (null? aa-checks) (null? pa-checks));happens when used to only check non-duplicate args
+                           1
+                           (/ (max 0 (- npass nerror)) nchecks))])
+               
+               (cond [(> nerror 0) (score-it 'test-thoroughness 1 0 #f "Test thoroughness (test argument coverage): incorrect - one or more tests caused an error.")]
+                     [(= % 1)      (score-it 'test-thoroughness 1 1 #f "Test thoroughness (test argument coverage): correct.")]
+                     [else         (score-it 'test-thoroughness 1 % #f "Test thoroughness (test argument coverage): incorrect - missing one or more cases.")]))))]))
 
 
 (define (test-args-equal-positions lo-args)
