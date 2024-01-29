@@ -963,6 +963,16 @@ validity, and test thoroughness results are reported. No grade information is re
              (weights* 1.0 '(.10 .10 .10 *) scores)))))))
 
 
+
+
+
+
+(define (grade-not-recursive [n 1])
+  (let* ([defn    (list-ref (htdf-defns (car (context))) (sub1 n))]
+         [fn-name (cdadr defn)]
+         [not-rec? (not (recursive? defn))])
+    (rubric-item 'template not-rec? "Must not use any part of a recursive template")))
+
 (define (grade-tail-recursive [n 1] [local-fn-names #f])
   (let* ([htdf   (car (context))]
          [defns  (and htdf (htdf-defns htdf))]
@@ -1196,7 +1206,7 @@ validity, and test thoroughness results are reported. No grade information is re
   (unless (if (symbol? guard)
 	      (and (pair? (context)) (eqv? (caar (context)) guard))
 	      (guard (context)))
-    (error "Must be ~a, instead context is ~a." str (context))))
+    (error 'assert-context "Must be ~a, instead context is ~a." str (context))))
 
 ;; !!! moves or goes away
 (define (check-bounds n max kind)
