@@ -139,9 +139,9 @@
          [reduction-total-weight (foldl + 0 (map reduction-w reductions))])
     
     (unless (= (round* score-total-weight 2) 1)
-      (error (format "Scores do not total to a weight of 1. (Totals to ~a.)" score-total-weight)))
+      (error* "Scores do not total to a weight of 1. (Totals to ~a.)" score-total-weight))
     (unless (<= (round* reduction-total-weight 2) 1)
-      (error (format "Reductions total to more than 1. (Total to ~a.)" reduction-total-weight)))
+      (error* "Reductions total to more than 1. (Total to ~a.)" reduction-total-weight))
 
     (score #f 1
            (round* (- (foldl + 0 (map * (map score-w scores) (map score-m scores)))
@@ -208,9 +208,9 @@
   (let ([scores (filter score? scores)])
     (foldl (lambda (s1 s2)
              (cond [(not (= (score-w s1) (score-w s2)))
-                    (error (format "~a (weighted ~a) and ~a (weighted ~a) should have same weight."
-                                   (score-m s1) (score-w s1)
-                                   (score-m s2) (score-w s2)))]
+                    (error "~a (weighted ~a) and ~a (weighted ~a) should have same weight."
+                           (score-m s1) (score-w s1)
+                           (score-m s2) (score-w s2))]
                    [(comp (score-m s1) (score-m s2)) s1]
                    [else s2]))
            (car scores)

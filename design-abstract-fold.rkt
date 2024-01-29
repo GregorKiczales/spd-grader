@@ -52,7 +52,7 @@ This solves problems about order of arguments.
      #'(recovery-point grade-design-abstract-fold
          (assert-context--@htdf)
          (unless (eqv? 'fn1 'fn2)
-           (error "fn name and name in function definition are not the same"))
+           (error* "fn name and name in function definition are not the same"))
          (check-design-abstract-fold 'fn1 'args (cdr 'sig) 'd1 'd2 'd3 'd4 'v3 'v4 '(@template-origin . origins) '(define (fn2 . args) . body)))]))
 
 

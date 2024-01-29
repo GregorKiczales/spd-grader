@@ -17,6 +17,8 @@
 
 (define-for-syntax TOPICS '(other
                             eval-etc
+                            dd-template-rules
+                            dd-template
                             signature
                             test-validity test-thoroughness 
                             template-origin
@@ -26,6 +28,8 @@
 
 (define            TOPICS '(other
                             eval-etc
+                            dd-template-rules
+                            dd-template
                             starter-intact
                             signature
                             test-validity test-thoroughness 
@@ -63,3 +67,5 @@
 (define (raise-student-error msg . v)
   (raise (exn:fail:student-error  (apply format msg v) (current-continuation-marks))))
 
+(define (error* fmt . args)
+  (error (apply format fmt args)))

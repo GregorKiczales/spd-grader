@@ -203,7 +203,7 @@
                                  (cdr rands))]))))))
 
 (define (step-local expr top-level-defs)
-  (error "not yet implemented"))
+  (error* "not yet implemented"))
 
 
 ;; precondition: all rands have been reduced to values

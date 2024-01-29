@@ -5,320 +5,109 @@
 (require (only-in 2htdp/image image?)
          "walker.rkt"
          "grader.rkt"
-         "utils.rkt")
+         "utils.rkt"
+         "type.rkt"
+         spd/constants)
 
 (module+ test
   (require rackunit))
 
-(provide grade-dd-rules-and-template
+(provide (all-from-out "type.rkt")
+         grade-dd-rules-and-template
          grade-dd-rules
          grade-dd-template
          grade-template
          grade-template-intact
          grade-not-recursive
-
-         grade-exact-template
          
          check-dd-rules
          check-dd-template
-         check-template-intact
 
          make-listof-type)
 
+
+
+
+
+
+;; PLAN
 ;;
-;; Type is one of:
-;;   "distinct string" empty false true  (symbols not values)
-;;   Number Integer Natural String Image Boolean
-;;   (one-of t...)
-;;   (compound (t...)       ;field types
-;;             symbol       ;maker
-;;             symbol       ;predicate
-;;             (symbol...)) ;selectors
-;;   (self-ref fn-for-<type-name>)
-;;   (ref fn-for-<type-name>)
+;;  grading unfilled template is in this file renamed to template, uses types, type names, and param and body
+;;  grading intactness is in other file renamed to template-intact, uses types, type names, and param and body
 ;;
-;; Also note these constraints
-;;
-;;  - one-of must be at top-level only
-;;  - compound cannot be nested inside compound
-;;  - allow distinct type for testing
-;;
-;; Together these mean that while the type type is recursive, no actual data of the type can really be
-;; arbitrary sized, or for that matter more than 3 deep (one-of -> compound -> atomic*,ref,self-ref).
+;; make check-template smarter, more flexible on things like order, maybe under flag control, ugh
+;;  add mechanism to allow more params and different param orders to checking by type first
+;;  then explore whether checking-by-type can be used for intactness in some cases
 ;;
 
-;; Types
 
-(define (one-of?   x) (and (list? x) (eqv? (car x) 'one-of)))
-(define (compound? x) (and (list? x) (eqv? (car x) 'compound) (= (length x) 5)))
-(define (self-ref? x) (and (list? x) (eqv? (car x) 'self-ref) (= (length x) 2)))
-(define (ref?      x) (and (list? x) (eqv? (car x) 'ref)      (= (length x) 2)))
-
-(define (make-listof-type fn-for-lox x)
-  `(one-of empty
-           (compound (,x (self-ref ,fn-for-lox)) cons cons? (first rest))))
-
-
-(define one-of-subclasses cdr)
-
-(define (compound-fts       c) (list-ref c 1))
-(define (compound-maker     c) (list-ref c 2))
-(define (compound-predicate c) (list-ref c 3))
-(define (compound-selectors c) (list-ref c 4))
-
-(define self-ref-fn cadr)
-(define ref-fn      cadr)
-
-(define (distinct? t) (eqv? (rule-kind t) 'atomic-distinct))
-(define (atomic?   t) (eqv? (rule-kind t) 'atomic-non-distinct))
-
-(define (rule-kind t)
-  (cond [(or (string? t) (member t '(true false empty)))           'atomic-distinct]
-        [(member t '(Number Integer Natural String Image Boolean)) 'atomic-non-distinct]
-        [(one-of? t)                                               'one-of]
-        [(compound? t)                                             'compound]
-        [(self-ref? t)                                             'self-ref]
-        [(and (pair? t) (eqv? (car t) 'ref))                       'ref]
-        [else
-         (error "unrecognized type ~a" t)]))
-
-
-;; -> raise internal error if type is malformed
-(define (ensure-type-is-well-formed type)
-  
-  (define (check ty in-one-of? in-compound?)
-    (cond [(atomic?   ty) #t]
-          [(distinct? ty) #t]
-	  [(one-of?   ty) (check-one-of   ty in-one-of? in-compound?)]
-	  [(compound? ty) (check-compound ty in-one-of? in-compound?)]
-          [(self-ref? ty) (and in-one-of? in-compound?)]
-          [(ref?      ty) in-compound?]
-	  [else
-	   (error "unrecognized type ~a" ty)]))
-  
-  (define (check-one-of ty in-one-of? in-compound?)
-    (and (not in-one-of?)
-         (not in-compound?)
-         (andmap (lambda (t)
-                   (check t #t #f))
-                 (one-of-subclasses ty))))
-  
-  (define (check-compound ty in-one-of? in-compound?)
-    (and (not in-compound?)
-         (andmap (lambda (t)
-                   (check t in-one-of? #t))
-                 (compound-fts ty))))
-  
-  (unless (check type #f #f)
-    (error "Type is not well formed: ~a" type)))
-
-
-;;
-;; 
-;;
 (define-syntax (grade-dd-rules-and-template stx)
   (syntax-case stx ()
-    [(_ type)   #'(grade-dd-rules-and-template 1 type)]
-    [(_ n type)
-     #'(recovery-point grade-dd-rules-and-template
-         (assert-context--@htdd)
-         (let* ([htdd      (car (context))]
-                [names     (htdd-names htdd)]
-                [rules     (htdd-rules htdd)]
-                [templates (htdd-templates htdd)])
-           (weights (.3 *)
-
-             (if (<= (length rules) (sub1 n))
-                 (score-it 'dd-rules
-                           1 0
-                           #f "dd template rules: could not find ~a @dd-template-rules tag." (number->ordinal* n))
-                 (check-dd-rules    'type (cdr (list-ref rules (sub1 n)))))
-
-             (if (<= (length templates) (sub1 n))
-                 (score-it 'dd-template
-                           1 0
-                           #f "dd template: could not find ~a dd template function definition." (number->ordinal* n))
-                 (check-dd-template 'type (list-ref templates (sub1 n)))))))]))
+    [(_   type) #'(grade-dd-rules-and-template* 1 `type)]
+    [(_ n type) #'(grade-dd-rules-and-template* n `type)]))
 
 (define-syntax (grade-dd-rules stx)
   (syntax-case stx ()
-    [(_ type)   #'(grade-dd-rules 1 type)]
-    [(_ n type)
-     #'(recovery-point grade-dd-rules
-         (assert-context--@htdd)
-         (let* ([htdd      (car (context))]
-                [names     (htdd-names htdd)]
-                [rules     (htdd-rules htdd)])
-           (cond [(<= (length rules) (sub1 n))
-                  (score-it 'dd-rules
-                            1 0
-                            #f "dd template rules: could not find ~a dd template rules tag." (number->ordinal* n))]
-                 [else
-                  (check-dd-rules 'type (cdr (list-ref rules (sub1 n))))])))]))
+    [(_   type) #'(grade-dd-rules* 1 `type)]
+    [(_ n type) #'(grade-dd-rules* n `type)]))
 
-(define-syntax (grade-dd-template stx)
-  (syntax-case stx ()
-    [(_ type)   #'(grade-dd-template 1 type)]
-    [(_ n type)
-     #'(recovery-point grade-dd-template
-         (assert-context--@htdd)
-         (let* ([htdd      (car (context))]
-                [templates (htdd-templates htdd)])
-           (cond [(<= (length templates) (sub1 n))
-                  (rubric-item 'dd-template #f
-                               "dd template: could not find ~a dd template function definition." (number->ordinal* n))]
-                 [else
-                  (let ([defn (list-ref templates (sub1 n))])
-                    (check-dd-template 'type defn))])))]))
-#;#;#;
-(define-syntax (grade-template stx)
-  (syntax-case stx (define)
-    [(_ . x ) #'(its-all-good-template)]))
-
-(define-syntax (grade-exact-template stx)
-  (syntax-case stx (define)
-    [(_ . x) #'(its-all-good-template)]))
-
-(define (its-all-good-template)
-  (let* ([htdf      (car (context))]
-         [templates (htdf-templates htdf)]
-         [template  (and (pair? templates) (car templates))])
-         
-    (rubric-item 'template
-                 (and template (pair? (cadr template)) (eqv? (caadr template) 'define))
-                 "Template appears inside @template")))
+(define-syntax (grade-dd-template stx)             ;used in m06 after
+  (syntax-case stx ()                              ;@dd-template-rules
+    [(_   type) #'(grade-dd-template* 1 `type)]    ;is not required
+    [(_ n type) #'(grade-dd-template* n `type)]))
 
 (define-syntax (grade-template stx)
   (syntax-case stx (define)
-    [(_   (define (fn-for . params) body)) #'(grade-template-from-define 1 'fn-for 'params 'body)]
-    [(_ n (define (fn-for . params) body)) #'(grade-template-from-define n 'fn-for 'params 'body)]
-    [(_   params type)                     #'(grade-template-from-type   1 'params 'type)]
-    [(_ n params type)                     #'(grade-template-from-type   n 'params 'type)]))
+    [(_   (param ...) type) #'(grade-template* 1 `(param ...) `type)]
+    [(_ n (param ...) type) #'(grade-template* n `(param ...) `type)]))
 
-(define-syntax (grade-exact-template stx)
-  (syntax-case stx (define)
-    [(_   (define (fn-for . params) body)) #'(grade-exact-template-helper 1 'fn-for 'params 'body)]
-    [(_ n (define (fn-for . params) body)) #'(grade-exact-template-helper n 'fn-for 'params 'body)]))
 
-(define (grade-template-from-type n params type)
-  (recovery-point grade-template
-    (let* ([htdf      (car (context))]
-           [templates (htdf-templates htdf)])
-      (cond [(<= (length templates) (sub1 n))
-             (rubric-item 'template #f
-                          "template: could not find ~a template function definition wrapped in @template." (number->ordinal* n))]
-            [else
-             (let* ([template  (list-ref templates (sub1 n))]
-                    [defn (template-defn template)])
-               (cond [(> (length (cdadr defn)) (length params))
-                      (rubric-item 'template #f
-                                   "template: ~a template has too many parameters" (number->ordinal* n))]
-                     [(< (length (cdadr defn)) (length params))
-                      (rubric-item 'template #f
-                                   "template: ~a template has too few parameters" (number->ordinal* n))]
-                     [else
-                      (check-template type defn)]))]))))
 
-(define (grade-template-from-define n fn-for params body)
-  (recovery-point grade-template
-    (assert-context--@htdf)
-    (let* ([htdf      (car (context))]
-           [templates (htdf-templates htdf)])
-      (cond [(<= (length templates) (sub1 n))
-             (rubric-item 'template #f
-                          "template: could not find ~a template function definition wrapped in @template." (number->ordinal* n))]
-            [else
-             (let* ([template  (list-ref templates (sub1 n))]
-                    [defn (template-defn template)])
-               (cond [(> (length (cdadr defn)) (length params))
-                      (rubric-item 'template #f
-                                   "template: ~a template has too many parameters" (number->ordinal* n))]
-                     [(< (length (cdadr defn)) (length params))
-                      (rubric-item 'template #f
-                                   "template: ~a template has too few parameters" (number->ordinal* n))]
-                     [else
-                      (check-template-intact defn `(define (,fn-for ,@params) ,body) "" "")]))]))))
+(define (grade-dd-rules-and-template* n type)
+  (recovery-point grade-dd-rules-and-template
+    (assert-context--@htdd)
+    (weights (.3 *)
+      (grade-dd-rules*    n type)
+      (grade-dd-template* n type))))
 
-(define (grade-exact-template-helper n fn-for params body)
+(define (grade-dd-rules* n type)
+  (recovery-point grade-dd-rules
+    (assert-context--@htdd)
+    (let* ([htdd    (car (context))]
+           [dd-name (cadr htdd)]
+           [rules   (find-@dd-template-rules-used-in-dd n)])
+      (if (not rules)
+          (rubric-item 'dd-template-rules #f
+                       "DD template rules: could not find ~a @dd-template-rules tag in (@htdd ~a)" (number->ordinal* n) dd-name)
+          (check-dd-rules type rules)))))
+
+(define (grade-dd-template* n type)
+  (recovery-point grade-dd-template
+    (assert-context--@htdd)
+    (let* ([htdd    (car (context))]
+           [dd-name (cadr htdd)]
+           [rules   (find-@dd-template-rules-used-in-dd n)]
+           [defn    (find-template-in-dd n)])
+      (if (not defn)
+          (rubric-item 'dd-template #f
+                       "DD template: could not find template function definition in (@htdd ~a)" dd-name)
+          (check-dd-template type defn)))))
+
+(define (grade-template* n params type-or-body)
   (recovery-point grade-template
     (assert-context--@htdf)
-    (let* ([htdf      (car (context))]
-           [templates (htdf-templates htdf)])
-      (cond [(<= (length templates) (sub1 n))
+    (let* ([htdf (car (context))]
+           [fn-name (cadr htdf)]
+           [defn (find-template-in-@template n)])
+      (cond [(not defn) 
              (rubric-item 'template #f
-                          "template: could not find ~a template function definition wrapped in @template." (number->ordinal* n))]
-            [else
-             (let* ([template  (list-ref templates (sub1 n))]
-                    [defn (template-defn template)])
-               (cond [(> (length (cdadr defn)) (length params))
-                      (rubric-item 'template #f
-                                   "template: ~a template has too many parameters" (number->ordinal* n))]
-                     [(< (length (cdadr defn)) (length params))
-                      (rubric-item 'template #f
-                                   "template: ~a template has too few parameters" (number->ordinal* n))]
-                     [else
-                      (rubric-item 'template
-                                   (equal? defn `(define (,fn-for ,@params) ,body))
-                                   "template")]))]))))
-
-
-
-(define-syntax (grade-template-intact stx)
-  (syntax-case stx (define)
-    [(_   (define (fn-for . params) body)) #'(grade-template-intact-from-define     1 `(define (fn-for . params) body))]
-    [(_ n (define (fn-for . params) body)) #'(grade-template-intact-from-define     n `(define (fn-for . params) body))]
-     
-    [(_   param body)                      #'(grade-template-intact-from-param-body 1 `param `body)]
-    [(_ n param body)                      #'(grade-template-intact-from-param-body n `param `body)]
-    
-    [(_ dd-name)                           #'(grade-template-intact-from-type-name  1 `dd-name)]))
-
-(define (grade-template-intact-from-type-name n dd-name)
-  (recovery-point grade-template-intact
-    (if (not (pair? (htdd-templates `(@htdd ,dd-name))))
-        (score-it 'template-intact 1 0 #f "Template intact: incorrect - could not find template in (@htdd ~a)." dd-name)
-        (let* ([template (car (htdd-templates `(@htdd ,dd-name)))] ;(define (fn-for... a) (cond ..))
-              ;[htdf (car (context))]
-              ;[defn (car (htdf-defns htdf))]
-               )
-          (grade-template-intact-from-define n template)))))
-                                             
-
-(define (grade-template-intact-from-param-body n param body)
-  (recovery-point grade-template-intact
-    (assert-context--@htdf)
-    (grade-template-intact-from-define n `(define (fn-for-x ,param) ,body))
-    #;
-    (let* ([htdf   (car (context))]
-           [defns  (htdf-defns htdf)])
-      (cond [(<= (length defns) (sub1 n))
-             (score-it 'template-intact
-                       1 0
-                       #f "Template intact: incorrect - could not find ~a function definition in ~a." (number->ordinal* n) htdf)]
-            [else
-             (check-template-intact (list-ref defns (sub1 n)) `(define (fn-for-x ,param) ,body))]))))
-
-(define (grade-template-intact-from-define n template)
-  (recovery-point grade-template-intact
-    (assert-context--@htdf)
-    (let* ([htdf   (car (context))]
-           [defns  (htdf-defns htdf)])
-      (cond [(<= (length defns) (sub1 n))
-             (score-it 'template-intact
-                       1 0
-                       #f "Template intact: incorrect - could not find ~a function definition in ~a." (number->ordinal* n) htdf)]
-            [else
-             (check-template-intact (list-ref defns (sub1 n)) template)]))))
-
-
-(define (grade-not-recursive [n 1])
-  (let* ([defn    (list-ref (htdf-defns (car (context))) (sub1 n))]
-         [fn-name (cdadr defn)]
-         [not-rec? (not (recursive? defn))])
-    (rubric-item 'template not-rec? "Must not use any part of a recursive template")))
-
-
-
+                          "Template: could not find ~a @template tag in (@htdf ~a)" (number->ordinal* n) fn-name)]
+            ;; !!! this should probably go into check-template
+            [(< (length (cdadr defn)) (length params))
+             (rubric-item 'template #f
+                          "Template: ~a template has too few parameters" (number->ordinal* n))]
+            [(type? type-or-body) (check-template/type type-or-body defn)]
+            [else                 (check-template/body defn `(define (fn-for ,@params) ,type-or-body))]))))
 
 
 
@@ -332,32 +121,39 @@
   (header "DD template:"
           (combine-scores (weights* 1.0 '(*) (check-dd-template-internal type defn)))))
 
-(define (check-template type defn)
+(define (check-template/type type defn)
   (ensure-type-is-well-formed type)
   (header "Template:"
           (combine-scores (weights* 1.0 '(*) (check-dd-template-internal type defn)))))
 
+(define (check-template/body sub-defn sol-defn)
+  (rubric-item 'template (check-template-bodies sub-defn sol-defn #t) "Template"))
+
+;; !!! goes to other file?
+(define (check-template-intact/body sub-defn sol-defn)
+  (rubric-item 'template (check-template-bodies sub-defn sol-defn #f) "Template intact"))
+
 
 (define (check-dd-rules-internal type rules)
-  
+
   (define (type->rules ty in-one-of? in-compound?)
-    (cond [(atomic?   ty) (if in-compound? '() '(atomic-non-distinct))]
-          [(distinct? ty) (if in-compound? '() '(atomic-distinct))]
-	  [(one-of?   ty) (cons 'one-of
+    (cond [(atomic-d?  ty) (if in-compound? '() '(atomic-distinct))]
+          [(atomic-nd? ty) (if in-compound? '() '(atomic-non-distinct))]
+          [(one-of?    ty) (cons 'one-of
                                 (foldr append '()
                                        (map (lambda (t2)
                                               (type->rules t2 #t #f))
                                             (one-of-subclasses ty))))]
-	  [(compound? ty) (cons 'compound
+          [(compound? ty) (cons 'compound
                                 (foldr append '()
                                        (map (lambda (t2)
                                               (type->rules t2 #f #t))
                                             (compound-fts ty))))]
           [(self-ref? ty) '(self-ref)]
           [(ref?      ty) '(ref)]
-	  [else
-	   (error "unrecognized type ~a" ty)]))
-
+          [else
+           (error* "unrecognized type ~a" ty)]))
+  
   (define (check sol sub)
     (cond [(and (empty? sol) (empty? sub)) '()]
           [(empty? sol)
@@ -399,78 +195,14 @@
   
   (check (type->rules type #f #f) rules))
 
-#;
-(define (check-dd-rules-internal type rules [allow-one-missing? #f])
-  
-  (define (peek) (and (pair? rules) (car rules)))
-  (define (pop)  (if (pair? rules)
-                     (begin0 (car rules) (set! rules (cdr rules)))
-                     "missing rule"))
-  
-  (define scores '())
-  
-  (define (tally sol)
-    (let ([sub (peek)])
-      (cond [(eqv? sub sol)
-             (pop)
-             (set! scores (cons (rubric-item 'dd-rules #t "~a" sol) scores))]
-            [allow-one-missing?
-             (set! allow-one-missing? false)
-             (set! scores (cons (rubric-item 'dd-rules #f "~a" sol) scores))]
-            [else
-             (pop)
-             (set! scores (cons (rubric-item 'dd-rules #f "~a" sol) scores))])))
-          
-  
-  (define (check ty in-one-of? in-compound?)
-    (cond [(atomic?   ty) (check-atomic   ty in-one-of? in-compound?)]
-          [(distinct? ty) (check-distinct ty in-one-of? in-compound?)]
-	  [(one-of?   ty) (check-one-of   ty in-one-of? in-compound?)]
-	  [(compound? ty) (check-compound ty in-one-of? in-compound?)]
-          [(self-ref? ty) (tally 'self-ref)]
-          [(ref?      ty) (tally 'ref)]
-	  [else
-	   (error "unrecognized type ~a" ty)]))
-  
-  (define (check-atomic ty in-one-of? in-compound?)
-    (cond [in-compound? (void)]          
-          [else         (tally 'atomic-non-distinct)]))
-  
-  (define (check-distinct ty in-one-of? in-compound?)
-    (cond [in-compound? (void)]
-          [else         (tally 'atomic-distinct)]))  ;let this happen at top level
-  
-  (define (check-one-of ty in-one-of? in-compound?)
-    (cond [in-one-of?   (error "one-of inside one-of??")]   ;!!!can no longer happen
-          [in-compound? (error "one-of inside compound??")] ;!!!can no longer happen
-          [else
-           (tally 'one-of)
-           (for ([ty1 (one-of-subclasses ty)])
-             (check ty1 #t #f))]))
-  
-  (define (check-compound ty in-one-of? in-compound?)
-    (cond [in-compound? (error "compound inside compound??")] ;!!!can no longer happen
-          [else
-           (tally 'compound)
-           (for ([ty1 (compound-fts ty)])
-             (check ty1 #f #t))]))
-  
-  (check type #f #f)
-  (for ([sub rules])
-    (unless allow-one-missing?
-      (set! scores
-            (cons (rubric-item 'dd-rules #f "extra rule: ~a" sub)
-                  scores)))
-    (set! allow-one-missing? #f))
-  
-  (reverse scores))
 
 
-(define fn-name    (make-parameter #f));name of the function
-(define params     (make-parameter #f));parameters
+(define fn-name    (make-parameter #f))
+(define params     (make-parameter #f))
 
 ;; precondition: type is well formed
-(define (check-dd-template-internal type defn)
+;; !!! add args for questions? order? nr? r? mr?
+(define (check-dd-template-internal type defn) ;!!! swap args to match sub sol order, and all throughout too
 
   (fn-name (caadr defn))
   (params  (cdadr defn))
@@ -485,20 +217,21 @@
                 scores)))
   
   (define (check ty expr [prefix ""])
-    (cond [(atomic?   ty) (tally (equal? expr `(... ,@(params))) "~aatomic non-distinct ~a" prefix expr)]
-          [(distinct? ty) (tally (equal? expr '(...))            "~aatomic distinct ~a"     prefix expr)]
-	  [(one-of?   ty) (check-one-of   ty expr prefix)]
-	  [(compound? ty) (check-compound ty expr prefix)]
-          ;; these can only be inside a compound
-          ;; [(self-ref? ty) ...]
-          ;; [(ref?      ty) ...]
+    (cond [(atomic-d? ty)  (tally (equal? expr '(...))            "~aatomic distinct ~a"     prefix expr)]
+          [(atomic-nd? ty) (tally (equal? expr `(... ,@(params))) "~aatomic non-distinct ~a" prefix expr)]
+	  [(one-of?   ty)  (check-one-of   ty expr prefix)]
+	  [(compound? ty)  (check-compound ty expr prefix)]
+          ;; Can only be inside compound
+          ;; [(self-ref?  ty) ...]
+          ;; [(ref?       ty) ...]
+          ;; [(mref?      ty) ...]
 	  [else
-	   (error "unrecognized type ~a" ty)]))
+	   (error* "unrecognized type ~a" ty)]))
   
   (define (check-one-of ty subx prefix)
-    (cond [(not (and (pair? subx) (eqv? (car subx) 'cond) (not (null? (cdr subx)))))
+    (cond [(not (cond-expr? subx))
            (tally #f "missing cond expression")
-           ;; if no cond just match rules
+           ;; if no cond all rules are incorrect
            (for [(ty1 (one-of-subclasses ty))]
              (tally #f "missing question for subclass ~a" (rule-kind ty1))
              (tally #f "missing answer for subclass ~a" (rule-kind ty1)))]
@@ -521,8 +254,8 @@
                              (tally #f "no question ~a" qa)
                              (tally #f "no answer ~a" qa)]
                             [else
-			     (check-question? t (car qa) rst)
-			     (check t (cadr qa) "cond answer ")])
+                             (check-question? t (car qa) rst)
+                             (check t (cadr qa) "cond answer ")])
 		      (loop (cdr ts) (cdr qas)))]))]))
   
   ;; precondition (eqv? (subr-pop) 'compound)
@@ -551,14 +284,14 @@
   
   
   (define (check-field ft sel subx)
-    (cond [(atomic? ft) ;!!! make this allow any order
-           ;; !!! this could do an ormap over (params) 
-           (tally (equal? subx `(,sel ,(car (params)))) "selector ~a" subx)]
-          [(distinct? ft)
+    (cond [(atomic-d? ft)
            (tally (or (equal? subx `(,sel ,(car (params))))
                       (equal? subx ft)
                       (equal? subx '(...)))
                   "selector ~a" subx)]
+          [(atomic-nd? ft) ;!!! make this allow any order
+           ;; !!! this could do an ormap over (params) 
+           (tally (equal? subx `(,sel ,(car (params)))) "selector ~a" subx)]
           [(self-ref? ft)
            (tally (contains-exp? `(,sel ,(car (params))) subx) "selector ~a" `(,sel ,(car (params))))
            (tally (equal? subx `(,(fn-name) (,sel ,(car (params))))) "natural recursion on result of selector ~a" subx)]
@@ -573,7 +306,7 @@
   (define (check-question? t1 subx rst [enum? #f] [allow-unsimplified? #t])
     (cond [(and (null? rst) (not enum?) (eqv? subx 'else))
            (tally #t "cond question ~s" subx)]
-          [(eqv? (rule-kind t1) 'atomic-distinct)
+          [(atomic-d? t1)
            (let* ([must-guard? (not (andmap (lambda (t2) (same-type? t1 t2)) rst))]
                   [must-test?  (ormap (lambda (t2) (same-type? t1 t2)) rst)]
                   [canon (canonicalize-question subx)])
@@ -588,7 +321,7 @@
                                     (equal? canon `(and ,(guard t1) ,(test t1))))
                                (equal? canon (test t1)))])
                     "cond question ~s" subx))]
-          [(eqv? (rule-kind t1) 'atomic-non-distinct)
+          [(atomic-nd? t1)
            (let* ([canon (canonicalize-question subx)])
              (tally (equal? canon (test t1)) "cond question ~s" subx))]
           [(compound? t1)
@@ -608,50 +341,41 @@
                       "cond question ~s"
                       subx))]
           [else
-           (error "can't check question for type ~a" t1)]))
+           (error* "can't check question for type ~a" t1)]))
   
   (check type (caddr defn))
   
   (reverse scores))
 
-(define (check-template-intact sub0 sol0 [prefix ""] [suffix "intact (cond questions not altered)"])
+;; !!! goes to other file
+(define (check-template-bodies sub0 sol0 answers?)
   ;; walk for equality, except after ... and in cond answers (deal w/ SR later)
 
   (define sub-params (cdadr sub0))
   (define sol-params (cdadr sol0))
-
-  #;
-  (define (param-map sub)
-    (let loop ([su sub-params]
-               [so sol-params])
-      (cond [(empty? so) #f]
-            [(empty? su) #f] ;this can't happen on code that checks syntax?
-            [(eqv? (car su) sub) (car so)]
-            [else
-             (loop (cdr su) (cdr so))])))
   
   (define (walk sub sol)
     (cond [(member sol sol-params) (member sub sub-params)]
 	  [(not (pair? sol))       (equal? sub sol)] ;1 2 3 "foo" #t...
           [(not (pair? sub)) #f]
-         ;[(eqv? (car sol) '...) #t]  ;shouldn't happen
+         ;[(eqv? (car sol) '...) #t]  ;would have been a red error !!! going to have to look at this now that we are used for intactness
           [(eqv? (car sol) 'cond)
            (and (pair? sub)
                 (eqv? (car sub) 'cond)
                 (= (length sub) (length sol))
-                (andmap walk (map car (cdr sub)) (map car (cdr sol))))] ;compare questions
+                (if answers?
+                    (andmap walk          (cdr sub)           (cdr sol))
+                    (andmap walk (map car (cdr sub)) (map car (cdr sol)))))]
           [else
            (and (= (length sub) (length sol))  ;compare expressions
                 (andmap walk sub sol))]))
+  (with-handlers ([void (lambda (e) #f)])    
+    (walk (caddr sub0) (caddr sol0))))
 
 
-  (rubric-item 'template-intact
-               (with-handlers ([void (lambda (e) #f)])
-                 (walk (caddr sub0) (caddr sol0)))
-               "~a~a~a"
-               (if (string=? prefix "") "Template" (string-append prefix " template"))
-               (if (string=? suffix "") "" " ")
-               suffix))
+;;
+;; Helpers
+;; 
 
 
 (define (distinct-value? x)
@@ -663,7 +387,7 @@
   (cond [(string? t)     `(string? ,(car (params)))]
         [(eqv? t 'false) `(false? ,(car (params)))]
         [(eqv? t 'empty) `(empty? ,(car (params)))]        
-        [else (error "Don't know how to guard ~a" t)]))
+        [else (error* "Don't know how to guard ~a" t)]))
 
 (define (test t)
   (cond [(string? t)      `(string=? ,(car (params)) ,t)]
@@ -679,13 +403,13 @@
 
 
 (define (same-type? t1 t2)
-  (cond [(not (distinct-value? t1)) (error "first arg to same-type? must be distinct value ~a" t1)]
+  (cond [(not (distinct-value? t1)) (error* "first arg to same-type? must be distinct value ~a" t1)]
         [(number?  t1)       (or (number? t2) (member t2 '(Number Integer Natural)))]
         [(string?  t1)       (or (string? t2) (eqv? t2 'String))]
-        [(image?   t1)       (error "bad type, distinct value should not be an image " t1)]
+        [(image?   t1)       (error* "bad type, distinct value should not be an image ~a" t1)]
         [(boolean-value? t1) (or (boolean-value? t2) (eqv? t2 'Boolean))]
         [(eqv? t1 'empty)    (eqv? t2 'empty)] ;what about list types?
-        [(compound? t1)      (error "bad type, distinct values must be atomic " t1)]
+        [(compound? t1)      (error* "bad type, distinct values must be atomic " t1)]
         [else false]))
 
 
@@ -694,7 +418,7 @@
         [(number? dv) '=]
         [(boolean-value? dv) 'eqv?]
         [else
-         (error "Bad type given to check-type, distinct field of compound is not string, number or boolean.")]))
+         (error* "Bad type given to check-type, distinct field of compound is not string, number or boolean.")]))
 
 (define (canonicalize-question subx)
   (cond [(pair? subx)
@@ -721,13 +445,80 @@
 
 (define (2list? x) (and (pair? x) (= (length x) 2)))
 
-(define (number->ordinal* n)
-  (if (= n 1)
-      ""
-      (format "~a " (number->ordinal n))))
+
+
+
+
+
+(define (find-@dd-template-rules-used-in-dd n)
+  (let* ([htdd      (car (context))]
+         [rules     (htdd-rules htdd)])
+    (and (pair? rules)
+         (>= (length rules) n)
+         (cdr (list-ref rules (sub1 n))))))
+
+(define (find-template-in-dd n)
+  (let* ([htdd      (car (context))]
+         [templates (htdd-templates htdd)])
+    (and (pair? templates)
+         (>= (length templates) n)
+         (list-ref templates (sub1 n)))))
+
+(define (find-template-in-@template n)
+  (let* ([htdf  (car (context))]
+         [ttags (htdf-templates htdf)])
+    (and (pair? ttags)
+         (>= (length ttags) n)
+         (template-defn (list-ref ttags (sub1 n))))))
+
+
+
+;; !!!!!!!!!!!!! this goes to other file
+
+;; this is all just check-template-intact, so it's equal?, except cond anwsers are ignored
+
+
+(define-syntax (grade-template-intact stx)
+  (syntax-case stx (define)
+    ;; !!! convert those possible
+    [(_   (param ...) body)   #'(grade-template-intact-from-param-body 1 `(param ...) `body)]
+    [(_ n (param ...) body)   #'(grade-template-intact-from-param-body n `(param ...) `body)]
+    
+    [(_   dd-name)            #'(grade-template-intact-from-type-name  1 `dd-name)]
+    [(_ n dd-name)            #'(grade-template-intact-from-type-name  n `dd-name)]))                                             
+
+(define (grade-template-intact-from-param-body n params body)
+  (recovery-point grade-template-intact
+    (assert-context--@htdf)
+    (grade-template-intact-from-define n `(define (fn-for-x ,@params) ,body))))
+
+(define (grade-template-intact-from-type-name n dd-name)
+  (recovery-point grade-template-intact
+    (if (not (pair? (htdd-templates `(@htdd ,dd-name))))
+        (rubric-item 'template-intact #f "Template intact: incorrect - could not find template in (@htdd ~a)" dd-name)
+        (let* ([template (car (htdd-templates `(@htdd ,dd-name)))] ;(define (fn-for... a) (cond ..))
+              ;[htdf (car (context))]
+              ;[defn (car (htdf-defns htdf))]
+               )
+          (grade-template-intact-from-define n template)))))
+
+(define (grade-template-intact-from-define n template)
+  (recovery-point grade-template-intact
+    (assert-context--@htdf)
+    (let* ([htdf   (car (context))]
+           [defns  (htdf-defns htdf)])
+      (cond [(<= (length defns) (sub1 n))
+             (rubric-item 'template-intact #f
+                          "Template intact: incorrect - could not find ~a function definition in ~a" (number->ordinal* n) htdf)]
+            [else
+             (check-template-intact/body (list-ref defns (sub1 n)) template)])))) ;!!! <<< GOES BACK TO CHECK-TEMPLATE-INTACT
 
 
 (module+ test
+
+  (define LON (make-listof-type 'Number 'fn-for-lon))
+
+  (define Cat '(compound (Integer Integer) make-cat cat? (cat-x cat-y)))
   
   ;; top-level distinct (shouldn't actually happen, but forms a base case for testing)
   (check-equal? (map score-m (check-dd-rules-internal "green"
@@ -747,8 +538,7 @@
   
   
   ;; 2 field compound of atomic non-distinct
-  (check-equal? (map score-m (check-dd-rules-internal '(compound (Integer Integer) make-cat cat? (cat-x cat-y))
-                                                      '(compound)))
+  (check-equal? (map score-m (check-dd-rules-internal Cat '(compound)))
                 '(1))
   
   
@@ -792,11 +582,7 @@
                 '(1 1 1))
   
   ;; LON
-  (check-equal? (map score-m (check-dd-rules-internal '(one-of empty
-                                                               (compound (Number (self-ref fn-for-lon))
-                                                                         cons
-                                                                         cons?
-                                                                         (first rest)))
+  (check-equal? (map score-m (check-dd-rules-internal LON
                                                       '(one-of atomic-distinct compound self-ref)))
                 '(1 1 1 1))
   
@@ -815,6 +601,7 @@
                                                                atomic-non-distinct)))
                 '(1 1 1 1 1 1))
   
+    
   
   
   
@@ -941,6 +728,15 @@
                                                                   [else (... l)]))))
                 '(1 0 1 1 1))
   
+  (check-equal? (map score-m (check-dd-template-internal '(one-of "a" "b" "c")
+                                                         '(define (fn-for-foo f)
+                                                            (cond [(string=? f "a") (...)]
+                                                                  [(string=? f "b") (...)]
+                                                                  [(string=? f "c") (...)]))))
+                '(1 1 1 1 1 1 1))
+
+  
+  
   (check-equal? (map score-m (check-dd-template-internal '(one-of "pre-launch" Number "post-flight")
                                                          '(define (fn-for-foo a)
                                                             (cond [(and (string? a) (string=? a "pre-launch")) (...)]
@@ -957,11 +753,7 @@
                 '(1 1 1 1 1))
   
   ;; LON
-  (check-equal? (map score-m (check-dd-template-internal '(one-of empty
-                                                                  (compound (Number (self-ref fn-for-lon))
-                                                                            cons
-                                                                            cons?
-                                                                            (first rest)))
+  (check-equal? (map score-m (check-dd-template-internal LON
                                                          '(define (fn-for-lon lon)
                                                             (cond [(empty? lon) (...)]
                                                                   [else
@@ -975,11 +767,7 @@
   
   
   ;; LON no NR
-  (check-equal? (map score-m (check-dd-template-internal '(one-of empty
-                                                                  (compound (Number (self-ref fn-for-lon))
-                                                                            cons
-                                                                            cons?
-                                                                            (first rest)))
+  (check-equal? (map score-m (check-dd-template-internal LON
                                                          '(define (fn-for-foo lon)
                                                             (cond [(empty? lon) (...)]
                                                                   [else
