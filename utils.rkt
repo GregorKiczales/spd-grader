@@ -91,7 +91,7 @@
         [(string-contains? line "htdp-intermediate-lambda-reader") '(special intermediate-lambda)]
         [(string-contains? line "htdp-advanced-reader")            '(special advanced)]
         [else
-	 (error (format "~s is not a valid reader line." line))]))
+	 (error* "~s is not a valid reader line." line)]))
 
 
 
@@ -127,15 +127,22 @@
   (/ (round (* (expt 10 decimals) value)) (expt 10 decimals)))
 
 (define (number->ordinal n)
-  (unless (and (not (negative? n)) (integer? n)) (error "Can't convert the number ~a to an ordinal." n))
+  (unless (and (not (negative? n)) (integer? n)) (error* "Can't convert the number ~a to an ordinal." n))
   (let ([nstr (number->string n)])
     (cond [(and (= 1 (modulo n 10)) (not (= n 11))) (string-append nstr "st")]
           [(and (= 2 (modulo n 10)) (not (= n 12))) (string-append nstr "nd")]
           [(and (= 3 (modulo n 10)) (not (= n 13))) (string-append nstr "rd")]
           [else (string-append nstr "th")])))
 
+(define (number->ordinal* n)
+  (if (= n 1)
+      ""
+      (format "~a " (number->ordinal n))))
+
 (define (plural n)
-  (if (or (= n 0) (> n 1)) "s" ""))
+  (if (list? n)
+      (plural (length n))
+      (if (or (= n 0) (> n 1)) "s" "")))
 
 (define (pluralize n str)
   (format "~a ~a~a" n str (plural n)))
