@@ -218,6 +218,7 @@
 (define (check?                x) (and (pair? x) (member (car x) CHECK-FORMS)))
 (define (check-expect?         x) (and (pair? x) (eq? (car x) 'check-expect)))
 (define (not-check-satisfied?  x) (or (not (pair? x)) (not (eqv? (car x) 'check-satisfied))))
+(define (cond-expr?            x) (and (pair? x) (eqv? (car x) 'cond) (pair? (cdr x))))
 
 (define fn-defn-name       caadr)
 (define fn-defn-parameters cdadr)
