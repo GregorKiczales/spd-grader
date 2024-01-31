@@ -7,10 +7,18 @@
          "grader.rkt"
          "utils.rkt"
          "type.rkt"
-         spd/constants)
+         ;spd/constants
+         )
 
 (module+ test
   (require rackunit))
+
+;; !!!
+(define @TAGS
+  '(@assignment @cwl
+                @problem
+                @htdw @htdd
+                @htdf @signature @dd-template-rules @template-origin @template))
 
 (provide (all-from-out "type.rkt")
          grade-dd-rules-and-template
