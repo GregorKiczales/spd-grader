@@ -2,9 +2,15 @@
 
 (require (only-in 2htdp/image image?)
          "defs.rkt"
-         spd/constants)
+         ;spd/constants
+         )
 
 (provide (all-defined-out))
+
+;;!!! for now this is copied from spd/constants
+(define    ATOMIC-TYPES '(Number Integer Natural String 1String Boolean Image Color Scene))
+(define PRIMITIVE-TYPES (append ATOMIC-TYPES '(KeyEvent MouseEvent)))
+
 
 ;;
 ;; Type is one of:
@@ -79,7 +85,7 @@
 (define (ensure-type-is-well-formed type)
   
   (define (check ty in-one-of? in-compound?)
-    (cond [(atomic-d?  ty) #t];(or in-one-of? in-compound?)] ;in compound for (cons "L" Path)
+    (cond [(atomic-d?  ty) (or in-one-of? in-compound?)] ;allow in compound for things like (cons "L" Path)
           [(atomic-nd? ty) #t]          
 	  [(one-of?    ty) (check-one-of   ty in-one-of? in-compound?)]
 	  [(compound?  ty) (check-compound ty in-one-of? in-compound?)]
