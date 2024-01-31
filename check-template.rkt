@@ -23,6 +23,8 @@
          check-dd-rules
          check-dd-template
 
+         check-template-intact/body
+
          make-listof-type)
 
 
@@ -130,8 +132,12 @@
   (rubric-item 'template (check-template-bodies sub-defn sol-defn #t) "Template"))
 
 ;; !!! goes to other file?
-(define (check-template-intact/body sub-defn sol-defn)
-  (rubric-item 'template (check-template-bodies sub-defn sol-defn #f) "Template intact"))
+(define (check-template-intact/body sub-defn sol-defn which)
+  (rubric-item 'template
+               (check-template-bodies sub-defn sol-defn #f)
+               (if (equal? which "")
+                   "Template intact"
+                   (format "Template intact ~a" which))))
 
 
 (define (check-dd-rules-internal type rules)
@@ -511,7 +517,7 @@
              (rubric-item 'template-intact #f
                           "Template intact: incorrect - could not find ~a function definition in ~a" (number->ordinal* n) htdf)]
             [else
-             (check-template-intact/body (list-ref defns (sub1 n)) template)])))) ;!!! <<< GOES BACK TO CHECK-TEMPLATE-INTACT
+             (check-template-intact/body (list-ref defns (sub1 n)) template (cadr htdf))])))) ;!!! <<< GOES BACK TO CHECK-TEMPLATE-INTACT
 
 
 (module+ test
