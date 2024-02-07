@@ -637,6 +637,7 @@ validity, and test thoroughness results are reported. No grade information is re
                                      '()
                                      (filter (lambda (p) (not (member p lop))) (test-args-equal-positions lo-args)))])
 
+
            (grade-prerequisite 'test-thoroughness
                "A set of tests must not have the same argument for any given parameter"
                (null? equal-positions)               
@@ -695,11 +696,23 @@ validity, and test thoroughness results are reported. No grade information is re
                 [nmissed   (count (lambda (x) (eqv? x #f)) results)]
                 [nerror    (count (lambda (x) (eqv? x 'error)) results)]
                 
-                [%         (/ ndetected ndefns)])
+                [%         (/ (max 0 (- ndetected nerror)) ndefns)])
+
+           (println (list results ndetected nmissed nerror))
            
-           (cond [(= % 1)        (score-it 'test-validity 1 1 #f "Test thoroughness (known fault detection): correct.")]
-                 [(zero? nerror) (score-it 'test-validity 1 % #f "Test thoroughness (known fault detection): incorrect - no submitted test failed for ~a of ~a known faulty functions." nmissed ndefns)]
-                 [else           (score-it 'test-validity 1 % #f "Test thoroughness (known fault detection): incorrect - no submitted test failed for ~a of ~a known faulty functions, and ~a tests caused an error." nmissed ndefns nerror)]))]))
+           (cond [(= ndetected ndefns) (score-it 'test-thoroughness 1 1 #f "Test thoroughness (known fault detection): correct.")]
+
+                 
+                 [(= nmissed   ndefns) (score-it 'test-thoroughness 1 % #f "Test thoroughness (known fault detection): incorrect - failed to detect any known faulty functions.")]
+                 [(= nerror    ndefns) (score-it 'test-thoroughness 1 % #f "Test thoroughness (known fault detection): incorrect - tests produced errors for all known faulty functions.")]
+                 
+                 [(= nerror    0)      (score-it 'test-thoroughness 1 % #f "Test thoroughness (known fault detection): incorrect - failed to detect ~a known faulty functions."          nmissed)]
+                 [(= nmissed   0)      (score-it 'test-thoroughness 1 % #f "Test thoroughness (known fault detection): incorrect - tests produced errors for ~a known faulty functions." nerror)]
+                 
+                 [else                 (score-it 'test-thoroughness 1 % #f
+                                                 "Test thoroughness (known fault detection): incorrect - failed to detect ~a known faulty functions, and tests produced errors for ~a other known faulty functions."
+                                                 nmissed
+                                                 nerror)]))]))
 
 ;; -> (listof (list (listof Any) Any)|'error)
 (define (get-lo-args-and-result fn-name checks)
