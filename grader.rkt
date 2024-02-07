@@ -554,7 +554,7 @@ validity, and test thoroughness results are reported. No grade information is re
         [else
          (let* ([names (map (lambda (x) (gensym)) tests)]
                 [results
-                 (calling-evaluator (eqv topic 'submitted-tests)
+                 (calling-evaluator (eq? topic 'submitted-tests)
                    `(%%call-thunks-with-handler
                      (local ,(for/list ([name names]
                                         [test tests])
