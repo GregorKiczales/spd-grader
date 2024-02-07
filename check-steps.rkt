@@ -1,6 +1,7 @@
 #lang racket
 
-(require spd-grader/grader
+(require racket/exn
+         spd-grader/grader
          spd-grader/utils)
 
 (provide grade-steps check-steps steps step)
@@ -30,9 +31,7 @@
                                (rubric-item 'evaluation
                                             #f
                                             "Error grading problem ~s"
-                                            (if (exn? e)
-                                                (exn-message e)
-                                                e)))])
+                                            (exn->string e)))])
          (assert-context--@problem)
          (check-steps (problem-sexps (car (context))) '(sexp ...)))]))
 
