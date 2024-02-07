@@ -147,6 +147,11 @@
 (define (pluralize n str)
   (format "~a ~a~a" n str (plural n)))
 
+(define (is/are n)
+  (if (list? n)
+      (is/are (length n))
+      (if (or (= n 0) (> n 1)) "are" "is")))
+
 (define (naturals->text lon)
   (define (scan lon)
     (cond [(empty? (rest lon)) (format ", and ~a" (car lon))]
