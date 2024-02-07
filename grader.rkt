@@ -571,9 +571,13 @@ validity, and test thoroughness results are reported. No grade information is re
                 [%      (/ (max 0 (- npass nerror)) ntests)])
            
            (cond [(= npass ntests)   (score-it topic 1 1 #f "~a tests: correct." Camel)]
-                 [(= nfail ntests)   (score-it topic 1 0 #f "~a tests: incorrect - all ~a tests failed." Camel lower)]
-                 [(=       nerror 0) (score-it topic 1 % #f "~a tests: incorrect - ~a failed." Camel
-                                               (pluralize nfail (format "~a test" lower)))]
+                 
+                 [(= nfail  ntests)   (score-it topic 1 0 #f "~a tests: incorrect - every ~a test failed." Camel lower)]
+                 [(= nerror ntests)   (score-it topic 1 0 #f "~a tests: incorrect - every ~a test caused an error." Camel lower)]
+                 
+                 [(= nerror 0)        (score-it topic 1 % #f "~a tests: incorrect - ~a failed." Camel (pluralize nfail (format "~a test" lower)))]
+                 [(= nfail  0)        (score-it topic 1 % #f "~a tests: incorrect - ~a caused an error." Camel (pluralize nfail (format "~a test" lower)))]
+                 
                  [else               (score-it topic 1 % #f "~a tests: incorrect - ~a failed and ~a caused an error." Camel
                                                (pluralize (- ntests npass nerror) (format "~a test" lower))
                                                (pluralize nerror (format "~a test" lower)))]))]))
@@ -606,10 +610,16 @@ validity, and test thoroughness results are reported. No grade information is re
 
                 [% (/ npass ntests)])
 
-             (cond [(= % 1)        (score-it 'test-validity 1 1 #f "Test validity (matches problem statement): correct.")]
-                   [(zero? nerror) (score-it 'test-validity 1 % #f "Test validity (matches problem statement): incorrect - ~a of ~a tests ~a invalid." nfail ntests (is/are ntests))]
-                   [(zero? nfail)  (score-it 'test-validity 1 % #f "Test validity (matches problem statement): incorrect - ~a of ~a tests caused an error." nerror ntests)]
-                   [else           (score-it 'test-validity 1 % #f "Test validity (matches problem statement): incorrect - ~a of ~a tests ~a invalid, and ~a caused an error." nfail ntests (is/are ntests) (pluralize nerror "test"))]))]))
+           (cond [(= npass  ntests) (score-it 'test-validity 1 1 #f "Test validity (matches problem statement): correct.")]
+                 
+                 [(= nfail  ntests) (score-it 'test-validity 1 0 #f "Test validity (matches problem statement): incorrect, every test invalid.")]
+                 [(= nerror ntests) (score-it 'test-validity 1 0 #f "Test validity (matches problem statement): incorrect, every test caused an error.")]
+                 
+                 [(= nerror 0)      (score-it 'test-validity 1 % #f "Test validity (matches problem statement): incorrect - ~a of ~a tests ~a invalid." nfail ntests (is/are nfail))]
+                 [(= nfail  0)      (score-it 'test-validity 1 % #f "Test validity (matches problem statement): incorrect - ~a of ~a tests caused an error." nerror ntests)]
+
+                 [else              (score-it 'test-validity 1 % #f "Test validity (matches problem statement): incorrect - ~a of ~a tests ~a invalid, and ~a caused an error."
+                                              nfail ntests (is/are nfail) (pluralize nerror "test"))]))]))
 
 (define (check-argument-thoroughness fn-name tests lop aa-param aa-checks pa-params pa-checks)
   (cond [(< (length tests) 2) (score-it 'test-thoroughness 1 0 #f "Test thoroughness (test argument coverage): incorrect - at least 2 tests are required.")]
