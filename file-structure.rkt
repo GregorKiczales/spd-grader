@@ -11,13 +11,10 @@
   '(check-expect check-random check-satisfied check-within check-error check-member-of check-range))
 
 
+(define (sexps)     (map elt-sexp (elts)))
 
-(define (get-defns)
-  (htdf-defns (car (context))))
-
-(define (get-defn)
-  (let ([defns (get-defns)])
-    (and (pair? defns) (car defns))))
+(define (get-defns) (htdf-defns (car (context))))
+(define (get-defn)  (let ([defns (get-defns)]) (and (pair? defns) (car defns))))
 
 
 
@@ -181,35 +178,36 @@
 (define (signature-result sig) (cadr (member '-> sig)))
 (define (signature-fail?  sig) (equal? (cddr (member '-> sig)) '(or false)))
 
-(define (problem-htdfs         t) (filter @htdf?              (tag-sexps t)))
+(define (problem-htdfs         t) (filter @htdf?               (tag-sexps t)))
 
-(define (htdf-sigs             t) (filter @signature?         (tag-sexps t)))
-(define (htdf-checks           t) (filter check?              (tag-sexps t)))
-(define (htdf-template-origins t) (filter @template-origin?   (tag-sexps t)))
-(define (htdf-templates        t) (filter @template?          (tag-sexps t)))
-(define (htdf-defns            t) (filter fn-defn?            (tag-sexps t)))
+(define (htdf-sigs             t) (filter @signature?          (tag-sexps t)))
+(define (htdf-checks           t) (filter check?               (tag-sexps t)))
+(define (htdf-template-origins t) (filter @template-origin?    (tag-sexps t)))
+(define (htdf-templates        t) (filter @template?           (tag-sexps t)))
+(define (htdf-defns            t) (filter fn-defn?             (tag-sexps t)))
 
-(define (htdd-constants        t) (filter const-defn?         (tag-sexps t)))
-(define (htdd-rules            t) (filter @dd-template-rules? (tag-sexps t)))
-(define (htdd-templates        t) (filter fn-defn?            (tag-sexps t)))
+(define (htdd-constants        t) (filter const-defn?          (tag-sexps t)))
+(define (htdd-rules            t) (filter @dd-template-rules?  (tag-sexps t)))
+(define (htdd-templates        t) (filter fn-defn?             (tag-sexps t)))
 
 
-(define (@assignment?          x) (and (pair? x) (eq? (car x) '@assignment)))
-(define (@cwl?                 x) (and (pair? x) (eq? (car x) '@cwl)))
+(define (@assignment?          x) (and (pair? x) (eq? (car x)  '@assignment)))
+(define (@cwl?                 x) (and (pair? x) (eq? (car x)  '@cwl)))
 
-(define (@problem?             x) (and (pair? x) (eq? (car x) '@problem)))
+(define (@problem?             x) (and (pair? x) (eq? (car x)  '@problem)))
 
-(define (@htdw?                x) (and (pair? x) (eq? (car x) '@htdw)))
-(define (@htdd?                x) (and (pair? x) (eq? (car x) '@htdd)))
-(define (@htdf?                x) (and (pair? x) (eq? (car x) '@htdf)))
+(define (@htdw?                x) (and (pair? x) (eq? (car x)  '@htdw)))
+(define (@htdd?                x) (and (pair? x) (eq? (car x)  '@htdd)))
+(define (@htdf?                x) (and (pair? x) (eq? (car x)  '@htdf)))
+(define (@htdf-main?           x) (and (pair? x) (equal? x     '(@htdf main))))
 
-(define (@signature?           x) (and (pair? x) (eq? (car x) '@signature)))
+(define (@signature?           x) (and (pair? x) (eq? (car x)  '@signature)))
 
-(define (@dd-template-rules?   x) (and (pair? x) (eq? (car x) '@dd-template-rules)))
-(define (@template-origin?     x) (and (pair? x) (eq? (car x) '@template-origin)))
-(define (@template?            x) (and (pair? x) (eq? (car x) '@template)))
+(define (@dd-template-rules?   x) (and (pair? x) (eq? (car x)  '@dd-template-rules)))
+(define (@template-origin?     x) (and (pair? x) (eq? (car x)  '@template-origin)))
+(define (@template?            x) (and (pair? x) (eq? (car x)  '@template)))
 
-(define (require?              x) (and (pair? x) (eq?   (car x) 'require)))
+(define (require?              x) (and (pair? x) (eq? (car x) 'require)))
 (define (fn-defn?              x) (and (pair? x) (eq? (car x) 'define) (pair? (cadr x)) (pair? (cddr x))))
 (define (const-defn?           x) (and (pair? x) (eq? (car x) 'define) (symbol? (cadr x))))
 (define (struct-defn?          x) (and (pair? x) (eq? (car x) 'define-struct)))
