@@ -2,15 +2,12 @@
 
 (require (only-in 2htdp/image image?)
          "defs.rkt"
-         ;spd/constants
-         )
+         spd/constants)
 
 (provide (all-defined-out))
 
-;;!!! for now this is copied from spd/constants
 (define    ATOMIC-TYPES '(Number Integer Natural String 1String Boolean Image Color Scene))
 (define PRIMITIVE-TYPES (append ATOMIC-TYPES '(KeyEvent MouseEvent)))
-
 
 ;;
 ;; Type is one of:
@@ -30,8 +27,8 @@
 ;;  - compound cannot be nested inside compound
 ;;  - allow distinct type for testing
 ;;
-;; Together these mean that while the type type is recursive, no actual data of the type can really be
-;; arbitrary sized, or for that matter more than 3 deep (one-of -> compound -> atomic*,ref,self-ref).
+;; Together these mean that while the type type is recursive, no actual data of the type type can really
+;; be arbitrary sized, or for that matter more than 3 deep (one-of -> compound -> atomic*,ref,self-ref).
 ;;
 
 ;; Types
