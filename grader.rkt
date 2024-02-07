@@ -113,7 +113,7 @@
     [(_ student? exp)
      #'(with-handlers ([exn:fail?
                         (lambda (e)
-                          (raise (exn:fail:eval-error (exn-message e) (current-continuation-marks) student?)))])
+                          (raise (exn:fail:eval-error (exn->string e) (current-continuation-marks) student?)))])
          ((evaluator) exp))]))
 
 
@@ -554,7 +554,7 @@ validity, and test thoroughness results are reported. No grade information is re
         [else
          (let* ([names (map (lambda (x) (gensym)) tests)]
                 [results
-                 (calling-evaluator #f
+                 (calling-evaluator (eqv topic 'submitted-tests)
                    `(%%call-thunks-with-handler
                      (local ,(for/list ([name names]
                                         [test tests])
