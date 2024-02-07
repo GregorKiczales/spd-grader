@@ -554,7 +554,8 @@ validity, and test thoroughness results are reported. No grade information is re
         [else
          (let* ([names (map (lambda (x) (gensym)) tests)]
                 [results
-                 (calling-evaluator (eq? topic 'submitted-tests)
+                 (calling-evaluator #f    ;#f because %%call-thunks-with-handler
+                                    ;;    ;wraps actual student code evaluation
                    `(%%call-thunks-with-handler
                      (local ,(for/list ([name names]
                                         [test tests])
@@ -624,7 +625,6 @@ validity, and test thoroughness results are reported. No grade information is re
                                      '()
                                      (filter (lambda (p) (not (member p lop))) (test-args-equal-positions lo-args)))])
 
-           ;; !!! change equal positions to grade-prerequisite
            (grade-prerequisite 'test-thoroughness
                "A set of tests must not have the same argument for any given parameter"
                (null? equal-positions)               
@@ -695,7 +695,7 @@ validity, and test thoroughness results are reported. No grade information is re
          [fn-names (map (lambda (ce) (gensym)) checks)])
     (if (empty? checks)
         '()
-        ((evaluator)
+        (calling-evaluator #f
          `(%%call-thunks-with-handler
            (local ,(for/list ([c     checks]
                               [fn-nm fn-names])
