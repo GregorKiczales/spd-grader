@@ -5,6 +5,7 @@
          racket/list
          racket/sequence
          racket/string
+         racket/exn
          "defs.rkt"
          "reloadable.rkt"
          "sandbox.rkt"
@@ -88,19 +89,24 @@
                         (lambda (e)
                           (cond [(exn:fail:student-error? e)
                                  (weights (*)
-                                          (score-it 'other 1 0 #f (exn-message e)))]
+                                   (score-it 'other 1 0 #f (exn->string e)))]
                                 [(exn:fail:ensure-violation? e)
                                  (weights (*)
-                                          (score-it 'other 1 0 #f "Grading of problem halted - ~a." (exn-message e)))]
+                                   (score-it 'other 1 0 #f "Grading of problem halted - ~a." (exn->string e)))]
                                 [(exn:fail:eval-error? e)
                                  (weights (*)
-                                          (if (exn:fail:eval-error-student? e)
-                                              (score-it 'other 1 0 #f "Error evaluating submitted code - ~a" (exn-message e))
-                                              (score-it 'other 1 0 #f "Error evaluating grader code that calls submitted code - ~a" (exn-message e))))]
+                                   (if (exn:fail:eval-error-student? e)
+                                       (score-it 'other 1 0 #f "Error evaluating submitted code - ~a" (exn->string e))
+                                       (score-it 'other 1 0 #f "Error evaluating grader code that calls submitted code - ~a" (exn->string e))))]
                                 [else
-                                 ((logger) (format "Internal grader system error ~a: ~a" n (exn-message e)))
+                                 ((logger) (format "Internal grader system error ~a: ~a" n (exn->string e)))
                                  (weights (*) (score-it 'other 1 1 #f "Internal grader system error, student given 100% on this problem. This does not necessarily mean the submission is correct. Grade may change when grader system error is fixed."))]))])
          exp ...)]))
+
+(define-syntax (recovery-point stx)
+  (syntax-case stx ()
+    [(_ w item ...)            ;!!! why is there no with-handlers here???
+     #'(begin item ...)]))
 
 (define-syntax (calling-evaluator stx)
   (syntax-case stx ()
@@ -168,19 +174,10 @@
                (loop        sol  (cdr sub)))])))
 
 
-
-
-;; !!!! temporary
-
-(define-syntax (recovery-point stx)
-  (syntax-case stx ()
-    [(_ w item ...)
-     #'(begin item ...)]))
-
 (define (autograde-file filename [verb? #t] [earl? #f] [rpt (current-output-port)] [logr displayln])
   (let ([grader
          (with-handlers ([exn:fail? (lambda (exn)
-                                      (logr (format "Error: problem loading grader for ~a - ~a" filename (if (exn? exn) (exn-message exn) exn))))])
+                                      (logr (format "Error: problem loading grader for ~a - ~a" filename (exn->string exn))))])
            (find-grader filename))])
     (autograde-file-with-grader filename grader verb? earl? rpt logr)))
 
@@ -190,7 +187,7 @@
                    (lambda (exn)
                      (logr (format "Error: framework error for submission ~a - ~a"
                                    filename
-                                   (if (exn? exn) (exn-message exn) exn))))])
+                                   (exn->string exn))))])
       (call-with-input-file* filename
 	(lambda (in)
           (read-line in)
@@ -219,27 +216,28 @@
 
                 (define (handle-submission-error exn)
                   (when (verbose-error-logging?)
-                    (logr (format "Error: running submission ~a - ~a" filename (exn-message exn))))
+                    (logr (format "Error: running submission ~a - ~a" filename (exn->string exn))))
                   ;; deliberately don't display error so students debug themselves
                   ;; rather than just try to debug from autograder reports
                   (display-overall-grade 0
-                                         (format "Error running submission ~a." (exn-message exn))
+                                         (format "Error running submission ~a." (exn->string exn))
                                          rpt)
                   (abort-current-continuation abort-tag (lambda () (void))))
 
                 (define (handle-framework-error exn)
                   ((logger) (format "Error: Framework error for submission ~a - ~a"
                                     filename
-                                    (if (exn? exn) (exn-message exn) exn)))
+                                    (exn->string exn)))
                   (display-overall-grade 100
                                          (format "Autograder framework error. ~a"
-                                                 (if (exn? exn) (exn-message exn) exn))
-                                         rpt))
+                                                 (exn->string exn))
+                                         rpt)
+                  (abort-current-continuation abort-tag (lambda () (void)))) ;!!! added 1/31/24
                 
                 (call-with-continuation-prompt 
                  (lambda ()
                    (let ([e
-                          ;; this handles errors in initial running of submission
+                          ;; this region is errors when originally running the submission
                           (with-handlers ([exn:fail:resource? handle-resource-error]
                                           [exn:fail? handle-submission-error])                            
                            (make-evaluator lang
@@ -260,10 +258,11 @@
                                                                "/usr/lib/ssl/certs")))])
                      ;; from here till we get inside grade-submission any errors are framework errors
                      (with-handlers ([exn:fail? handle-framework-error ])
-                       (let ([s 
+                       (let ([s
                               (parameterize ([evaluator 
                                               (lambda (x)
                                                 ;; these are errors when the grader makes additional calls to the evaluator
+                                                ;; we abort on resource errors and let others through
                                                 (with-handlers ([exn:fail:resource? handle-resource-error])
                                                   (e (if (string? x) `(identity ,x) x))))]
                                              [logger    logr]
@@ -272,7 +271,7 @@
                                 (elts (fn->elts filename))
                                 (grader))])
 
-                         ;; we now have a score report, time to render it
+                         ;; we now have a score, time to render it
                       (parameterize ([verbose? verb?]
                                      [early? earl?])
                         (cond [earl?
@@ -398,30 +397,38 @@ validity, and test thoroughness results are reported. No grade information is re
                (header (format "~a: " (car (context)))
                  (weights (*) item ...)))))]))
 
-(define-syntax (grade-bb-handler stx) ;this may be too specialized for this file
+(define-syntax (grade-bb-handler stx)
   (syntax-case stx ()
-    [(_ name fn item ...)
-     #'(if (false? fn)
-           (rubric-item 'other #f "couldn't find ~a handler function" 'name)
-           (recovery-point grade-bb-handler
-             (assert-context--@problem)
-             (parameterize ([context (cons (get-htdf* fn) (context))])
-               (header (format "big-bang ~a handler:" 'name)
-                       (weights (*) item ...)))))]))
+    [(_ (option fn) item ...)
+     #'(begin
+         (let ([fn (find-bb-handler 'option)])
+           (grade-htdf ,fn item ...)))]))
 
-(define (grade-htdf* fn thnk)  ;!!! try to make this go away w/ check-htdf, but used in pset 4
-  (recovery-point grade-htdf*
-   (assert-context--@problem)
-   (parameterize ([context (cons (get-htdf* fn) (context))])
-     (header (format "~a: " (car (context)))
-             (thnk)))))
+(define (find-bb-handler option)
+  (let* ([htdf '(@htdf main)]
+         [defns (htdf-defns htdf)]
+         [defn  (and (pair? defns) (car defns))]
+         [alist (and defn (cddr (caddr defn)))]
+
+         [entry (and alist
+                     (if (memq option '(on-draw to-draw))
+                         (or (assq 'on-draw alist)
+                             (assq 'to-draw alist))
+                         (assq option alist)))])
+
+    (if entry
+        (cadr entry)
+        (rubric-item "big-bang ~a handler - could not find ~a option to big-bang" option option))))
+
+
   
 (define-syntax (grade-signature stx)
   (syntax-case stx ()
-    [(_ sol)   #'(grade-signature 1 sol)]
+    [(_   sol) #'(grade-signature-1 1 `sol)]
     [(_ n sol) #'(grade-signature-1 n `sol)]
-    [(_ n sol sol2 ...) #'(score-max (grade-signature n sol)
-                                     (grade-signature n sol2) ...)]))
+    [(_ n sol sol2 ...) #'(score-max (grade-signature-1 n `sol) 
+                                     (grade-signature-1 n `sol2)
+                                     ...)]))
 
 (define (grade-signature-1 n sol)
   (recovery-point grade-signature
@@ -451,8 +458,15 @@ validity, and test thoroughness results are reported. No grade information is re
   ;(check-bounds n (length (htdf-names (car (context)))) "function definition")
   (let* ([htdf    (car (context))]
          [fn-name (if (symbol? n) n (list-ref (htdf-names htdf) (sub1 n)))]
+         [defns   (htdf-defns htdf)]
+         [defn    (and (pair? defns) (car defns))]
+         [body    (and defn (caddr defn))]
+         [stub?   (or (not (list? body))
+                      (equal? body 'empty)
+                      (equal? body '()))]
          [tests (get-function-tests fn-name)])
-    (check-submitted-tests fn-name tests)))
+    (grade-prerequisite 'submitted-tests "submitted-tests: function definition must be more than a stub" (not stub?)
+      (check-submitted-tests fn-name tests))))
                                    
 
 (define-syntax (grade-additional-tests stx)
@@ -706,46 +720,6 @@ validity, and test thoroughness results are reported. No grade information is re
             (%%check-random thunk1 thunk2))]
         [else test-expr])
       test-expr))
-
-
-
-
-;; -> true | false | error
-#;
-(define (eval-test test-expr)
-  (with-handlers ([exn:fail? (lambda (e) 'error)])
-    (case (car test-expr)
-      [(check-expect)     (equal? (calling-evaluator #t (cadr test-expr))
-                                  (calling-evaluator #t (caddr test-expr)))]
-      [(check-member)     (and (member (calling-evaluator #t (cadr test-expr))
-                                       (calling-evaluator #t (caddr test-expr)))
-                               #t)]
-      [(check-equal-sets) (equal-sets? (calling-evaluator #t (cadr test-expr))
-                                       (calling-evaluator #t (caddr test-expr)))]
-      
-      [(check-within)     (<= (magnitude (- (calling-evaluator #t (cadr test-expr))
-                                            (calling-evaluator #t (caddr test-expr))))
-                              (calling-evaluator #t (cadddr test-expr)))]
-      [(check-satisfied)  (and (calling-evaluator #t `(,(caddr test-expr) ,(cadr test-expr)))
-                               true)]
-      
-      [(check-random)
-       (let ([rng (make-pseudo-random-generator)]
-             [k (modulo (current-milliseconds) (sub1 (expt 2 31)))])
-         (equal? (begin (call-in-sandbox-context (evaluator)
-                                                 (thunk (current-pseudo-random-generator rng)
-                                                        (random-seed k)))
-                        (calling-evaluator #t (cadr test-expr)))
-                 (begin (call-in-sandbox-context (evaluator)
-                                                 (thunk (current-pseudo-random-generator rng)
-                                                        (random-seed k)))
-                        (calling-evaluator #t (caddr test-expr)))))]
-
-      [else
-       (let ([result (calling-evaluator #t test-expr)])
-         (if (boolean? result)
-             result
-             true))])))
 
 
 
@@ -1197,10 +1171,11 @@ validity, and test thoroughness results are reported. No grade information is re
 
 ;; used to enforce proper nesting of grader-* forms in autograder files
 
-(define (assert-context--top-level) (assert-context empty?    "at top-level inside grade-submission."))
-(define (assert-context--@problem)  (assert-context '@problem "immediately inside grade-problem."))
-(define (assert-context--@htdd)     (assert-context '@htdd    "immediately inside grade-htdd."))
-(define (assert-context--@htdf)     (assert-context '@htdf    "immediately inside grade-htdf."))
+(define (assert-context--top-level)  (assert-context empty?      "at top-level inside grade-submission."))
+(define (assert-context--@problem)   (assert-context '@problem   "immediately inside grade-problem."))
+(define (assert-context--@htdd)      (assert-context '@htdd      "immediately inside grade-htdd."))
+(define (assert-context--@htdf)      (assert-context '@htdf      "immediately inside grade-htdf."))
+(define (assert-context--@htdf-main) (assert-context @htdf-main? "immediately inside grade-htdf."))
 
 (define (assert-context guard str)
   (unless (if (symbol? guard)
