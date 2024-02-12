@@ -623,6 +623,7 @@ validity, and test thoroughness results are reported. No grade information is re
                                               (pluralize nfail   "test")
                                               (pluralize nerror  "test"))]))]))
 
+
 (define (check-argument-thoroughness fn-name tests lop aa-param aa-checks pa-params pa-checks)
   (cond [(< (length tests) 2) (score-it 'test-thoroughness 1 0 #f "Test thoroughness (test argument coverage): incorrect - at least 2 tests are required.")]
         [else
@@ -633,7 +634,7 @@ validity, and test thoroughness results are reported. No grade information is re
                 [aa-check-names (map (lambda (x) (gensym)) aa-checks)]
                 [pa-check-names (map (lambda (x) (gensym)) pa-checks)]
 
-                [equal-positions (if (null? lo-args) ;all the tests might have errored
+                [equal-positions (if (null? lo-args)               ;all might have errored
                                      '()
                                      (filter (lambda (p) (not (member p lop))) (test-args-equal-positions lo-args)))])
 
@@ -668,14 +669,17 @@ validity, and test thoroughness results are reported. No grade information is re
                      [else         (score-it 'test-thoroughness 1 % #f "Test thoroughness (test argument coverage): incorrect - missing one or more cases.")]))))]))
 
 
-(define (test-args-equal-positions lo-args)
-  (let* ([nargs (length (car lo-args))])
-    (map add1
-         (filter (lambda (i)
-                   (let ([args-at-p (for/list ([args lo-args]) (list-ref args i))])
-                     (andmap (lambda (x) (equal? x (car args-at-p))) (cdr args-at-p))))
-                 (sequence->list (in-range nargs))))))
 
+(define (test-args-equal-positions lo-args)
+  (let ([nargs (length (car lo-args))]
+        [lengths (map length lo-args)])
+    (if (not (andmap (lambda (l) (= l (car lengths))) (cdr lengths))) ;not equal nargs
+        '()
+        (map add1
+             (filter (lambda (i)
+                       (let ([args-at-p (for/list ([args lo-args]) (list-ref args i))])
+                         (andmap (lambda (x) (equal? x (car args-at-p))) (cdr args-at-p))))
+                     (sequence->list (in-range nargs)))))))
 
 
 (define (check-faulty-functions fn-name tests defns)
@@ -698,21 +702,25 @@ validity, and test thoroughness results are reported. No grade information is re
                 
                 [%         (/ (max 0 (- ndetected nerror)) ndefns)])
 
-           (println (list results ndetected nmissed nerror))
+           (define (one-score str . args) (score-it 'test-thoroughness 1 % #f (format "Test thoroughness (known fault detection): ~a." (apply format str args))))
            
-           (cond [(= ndetected ndefns) (score-it 'test-thoroughness 1 1 #f "Test thoroughness (known fault detection): correct.")]
+           ;(score-it 'test-thoroughness 1 1 #f "Test thoroughness (known fault detection): correct.")]
+           ;(score-it 'test-thoroughness 1 % #f "Test thoroughness (known fault detection): incorrect - failed to detect any known faulty functions.")]
+           ;(score-it 'test-thoroughness 1 % #f "Test thoroughness (known fault detection): incorrect - tests produced errors for all known faulty functions.")]
+           ;(score-it 'test-thoroughness 1 % #f "Test thoroughness (known fault detection): incorrect - failed to detect ~a known faulty functions."          nmissed)]
+           ;(score-it 'test-thoroughness 1 % #f "Test thoroughness (known fault detection): incorrect - tests produced errors for ~a known faulty functions." nerror)]
+           ;(score-it 'test-thoroughness 1 % #f "Test thoroughness (known fault detection): incorrect - failed to detect ~a known faulty functions, and tests produced errors for ~a other known faulty functions." nmissed nerror)
+           (cond [(= ndetected ndefns) (one-score "correct")]
 
+                 [(= nmissed   ndefns) (one-score "incorrect - failed to detect any known faulty functions")]
+                 [(= nerror    ndefns) (one-score "incorrect - tests produced errors for all known faulty functions")]
+                             
+                 [(= nerror    0)      (one-score "incorrect - failed to detect ~a known faulty functions"          nmissed)] 
+                 [(= nmissed   0)      (one-score "incorrect - tests produced errors for ~a known faulty functions" nerror)]
                  
-                 [(= nmissed   ndefns) (score-it 'test-thoroughness 1 % #f "Test thoroughness (known fault detection): incorrect - failed to detect any known faulty functions.")]
-                 [(= nerror    ndefns) (score-it 'test-thoroughness 1 % #f "Test thoroughness (known fault detection): incorrect - tests produced errors for all known faulty functions.")]
-                 
-                 [(= nerror    0)      (score-it 'test-thoroughness 1 % #f "Test thoroughness (known fault detection): incorrect - failed to detect ~a known faulty functions."          nmissed)]
-                 [(= nmissed   0)      (score-it 'test-thoroughness 1 % #f "Test thoroughness (known fault detection): incorrect - tests produced errors for ~a known faulty functions." nerror)]
-                 
-                 [else                 (score-it 'test-thoroughness 1 % #f
-                                                 "Test thoroughness (known fault detection): incorrect - failed to detect ~a known faulty functions, and tests produced errors for ~a other known faulty functions."
-                                                 nmissed
-                                                 nerror)]))]))
+                 [else                 (one-score "incorrect - failed to detect ~a known faulty functions, and tests produced errors for ~a other known faulty functions."
+                                                  nmissed
+                                                  nerror)]))]))
 
 ;; -> (listof (list (listof Any) Any)|'error)
 (define (get-lo-args-and-result fn-name checks)
