@@ -1,6 +1,7 @@
 #lang racket
 
 (require "grader.rkt"
+         "type.rkt"
          "walker.rkt")
 
 (provide grade-encapsulated-template-fns
@@ -39,18 +40,34 @@
 
 ;; this could be switched to take a type
 (define-syntax (grade-questions-intact stx)
-  (syntax-case stx ()    
-    [(_ fn-name (param ...) (cond qa-pair ...))
-     #'(let ([what (format "~a - cond questions intact" 'fn-name)])
-         (guard-template-fn-grading fn-name 'template-intact what
-                                    (rubric-item 'template-intact
-                                                 (and fn-name
-                                                      (filled? fn-name)
-                                                      (let [(cond-expr (get-cond fn-name))]
-                                                        (and (list? cond-expr)
-                                                             (equal? (map car (cdr cond-expr))
-                                                                     (map car '(qa-pair ...))))))
-                                                 what)))]))
+  (syntax-case stx ()
+    [(_ fn x1 ...)
+     #'(grade-questions-intact* fn `(x1 ...))]
+    #;
+    [(_ fn (param ...) (cond qa-pair ...))
+     #'(grade-questions-intact*/body fn
+                                     `(param ...)
+                                     `(qa-pair ...))]))
+
+
+
+;;!!! this should have a form that takes the type, calling back to check-template/types-internal
+;;
+(define (grade-questions-intact* fn-defn lox)  
+  (let* ([fn-name (and (fn-defn? fn-defn) (caadr fn-defn))]
+         [what (format "~a - cond questions intact" fn-name)])
+    (guard-template-fn-grading fn-name 'template-intact what
+                               (if (type? (car lox))
+                                   'foo
+                                   (rubric-item 'template-intact
+                                                (and (fn-defn? fn-defn)
+                                                     (filled? fn-defn)
+                                                     (let [(cond-expr (get-cond fn-defn))]
+                                                       (and (list? cond-expr)
+                                                            (equal? (map car (cdr cond-expr))
+                                                                    (map car (cdr (cadr lox)))))))
+                                                what)))))
+
 
 
 (define-syntax (grade-nr-intact stx)
