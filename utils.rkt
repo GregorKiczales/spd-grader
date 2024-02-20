@@ -37,7 +37,6 @@
 	[(eqv? x #f)      'false]
 	[(eqv? x 'time)   'time*] ;!!! are these still needed?
 	[(eqv? x 'sort)   'sort*] ;!!!
-	[(eqv? x 'filter) 'filter*] ;!!!
         [else x]))
 
 
