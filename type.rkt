@@ -42,8 +42,9 @@
       (ref?       x)
       (mref?      x)))
 
-(define (atomic-d?  x) (or (string? x) (memq x '(true false empty))))
-(define (atomic-nd? x) (memq x ATOMIC-TYPES))
+(define (atomic?    x) (or (atomic-d? x) (atomic-nd? x)))
+(define (atomic-d?  x) (and (or (string? x) (memq x '(true false empty))) #t))
+(define (atomic-nd? x) (and (memq x ATOMIC-TYPES) #t))
 (define (one-of?    x) (and (list? x) (eqv? (car x) 'one-of)))
 (define (compound?  x) (and (list? x) (eqv? (car x) 'compound) (= (length x) 5)))
 (define (self-ref?  x) (and (list? x) (eqv? (car x) 'self-ref) (= (length x) 2)))
@@ -79,31 +80,29 @@
 
 
 ;; -> raise internal error if type is malformed
+;;
+;; In terms of static types, types look mutually recursive. But our well-formedness rules are far
+;; more restrictive:
+;;   one-of   can contain compound and atomic*
+;;   compound can contain ref* and atomic*
+;; nothing else contains anything
+;;
 (define (ensure-type-is-well-formed type)
   
   (define (check ty in-one-of? in-compound?)
-    (cond [(atomic-d?  ty) (or in-one-of? in-compound?)] ;allow in compound for things like (cons "L" Path)
+    (cond [(atomic-d?  ty) (or       in-one-of?       in-compound?)] ;allowed in compound for things like (cons "L" Path)
           [(atomic-nd? ty) #t]          
-	  [(one-of?    ty) (check-one-of   ty in-one-of? in-compound?)]
-	  [(compound?  ty) (check-compound ty in-one-of? in-compound?)]
-          [(self-ref?  ty) (and in-one-of? in-compound?)]
-          [(ref?       ty) in-compound?]
-          [(mref?      ty) in-compound?]
+	  [(one-of?    ty) (and (not in-one-of?) (not in-compound?) (check-one-of   ty))]
+	  [(compound?  ty) (and                  (not in-compound?) (check-compound ty in-one-of?))]
+
+          [(self-ref?  ty) (and      in-one-of?       in-compound?)] ; these three are syntactically leaves
+          [(ref?       ty)                            in-compound?]  ; so they enclose nothing
+          [(mref?      ty)                            in-compound?]  ;
 	  [else
 	   (error* "unrecognized type ~a" ty)]))
   
-  (define (check-one-of ty in-one-of? in-compound?)
-    (and (not in-one-of?)
-         (not in-compound?)
-         (andmap (lambda (t)
-                   (check t #t #f))
-                 (one-of-subclasses ty))))
-  
-  (define (check-compound ty in-one-of? in-compound?)
-    (and (not in-compound?)
-         (andmap (lambda (t)
-                   (check t in-one-of? #t))
-                 (compound-fts ty))))
+  (define (check-one-of   ty)            (andmap (lambda (t) (check t #t         #f)) (one-of-subclasses ty)))
+  (define (check-compound ty in-one-of?) (andmap (lambda (t) (check t in-one-of? #t)) (compound-fts      ty)))
   
   (unless (check type #f #f)
     (error* "Type is not well formed: ~a" type)))
