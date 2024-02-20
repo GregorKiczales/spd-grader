@@ -399,10 +399,16 @@ validity, and test thoroughness results are reported. No grade information is re
 
 (define-syntax (grade-bb-handler stx)
   (syntax-case stx ()
-    [(_ (option fn) item ...)
+    [(_ (option handler-name) item ...) #'(grade-bb-handler (option handler-name _) item ...)]
+    [(_ (option handler-name handler-defn) item ...)
      #'(begin
-         (let ([fn (find-bb-handler 'option)])
-           (grade-htdf ,fn item ...)))]))
+         (assert-context--@problem)
+         (let ([handler-name (find-bb-handler 'option)])
+           (parameterize ([context (cons (get-htdf* handler-name) (context))])
+             (header (format "~a: " (car (context)))
+               (let* ([defns (htdf-defns (car (context)))]
+                      [handler-defn (and (pair? defns) (car defns))])
+                 (weights (*) item ...))))))]))
 
 (define (find-bb-handler option)
   (let* ([htdf '(@htdf main)]
