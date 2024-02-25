@@ -2,6 +2,7 @@
 
 (require "grader.rkt"
          "type.rkt"
+         "check-template.rkt"
          "walker.rkt")
 
 (provide grade-encapsulated-template-fns
@@ -38,13 +39,12 @@
               body])]))
 
 
-;; this could be switched to take a type
 (define-syntax (grade-questions-intact stx)
   (syntax-case stx ()
     [(_ fn x1 ...)
-     #'(grade-questions-intact* fn `(x1 ...))]
+     #'(grade-questions-intact* fn `(x1 ...))
     #;
-    [(_ fn (param ...) (cond qa-pair ...))
+
      #'(grade-questions-intact*/body fn
                                      `(param ...)
                                      `(qa-pair ...))]))
@@ -55,10 +55,11 @@
 ;;
 (define (grade-questions-intact* fn-defn lox)  
   (let* ([fn-name (and (fn-defn? fn-defn) (caadr fn-defn))]
-         [what (format "~a - cond questions intact" fn-name)])
+         [what (format "~a - cond questions intact:" fn-name)])
     (guard-template-fn-grading fn-name 'template-intact what
                                (if (type? (car lox))
-                                   'foo
+                                   (header "cond questions intact"
+                                     (check-questions/types lox fn-defn))
                                    (rubric-item 'template-intact
                                                 (and (fn-defn? fn-defn)
                                                      (filled? fn-defn)
