@@ -30,6 +30,7 @@
          check-dd-rules
          check-dd-template
          check-template/types
+         check-questions/types
          check-template/body
          
          grade-template-intact
@@ -85,19 +86,12 @@
 ;; (grade-template (ws x y me) (cond [(mou...) (... (ball-x ws) ]))
 ;;
 (define-syntax (grade-template stx)
+  ;; Have to call a single function rather than distinguishing the different forms here
+  ;; in the macro because otherwise we need a fender expression in the syntax-case, and
+  ;; that conflicts with the way we use , in some calls to the grade-... macros.
   (syntax-case stx (define)
     [(_ x1 ...) #'(grade-template* `(x1 ...))]))
 
-;; Have to call a function this way because otherwise we need a fender
-;; expression in the syntax-case, and that conflicts with the way we
-;; use , in uses of the grade-... macros.
-
-
-
-(define (grade-template* args)
-  (if (type? (car args))
-      (grade-template*/types args)
-      (grade-template*/body (car args) (cadr args))))
 
 (define (grade-dd-rules-and-template* n type)
   (recovery-point grade-dd-rules-and-template
@@ -129,24 +123,17 @@
                        "DD template: could not find template function definition in (@htdd ~a)" dd-name)
           (check-dd-template type defn)))))
 
-(define (grade-template*/types types)
-  (recovery-point grade-template
-    (assert-context--@htdf)
-    (let* ([htdf (car (context))]
-           [defn (find-template-in-@template 1)])
-      (if (not defn) 
-          (rubric-item 'template #f "Template: could not find @template tag in ~a" htdf)
-          (check-template/types types defn)))))
 
-(define (grade-template*/body params type-or-body)
+(define (grade-template* args)
   (recovery-point grade-template
     (assert-context--@htdf)
     (let* ([htdf (car (context))]
-           [fn-name (cadr htdf)]
            [defn (find-template-in-@template 1)])
-      (if (not defn) 
-          (rubric-item 'template #f "Template: could not find @template tag in ~a" htdf)
-          (check-template/body defn `(define (fn-for ,@params) ,type-or-body))))))
+      (cond [(not defn) 
+             (rubric-item 'template #f "Template: could not find @template tag in ~a" htdf)]
+            [(type? (car args)) (check-template/types args defn)]
+            [else               (check-template/body defn `(define (fn-for ,@(car args)) ,(cadr args)))]))))
+
 
 
 
@@ -165,7 +152,12 @@
 (define (check-template/types types defn)
   (for ([type types]) (ensure-type-is-well-formed type))
   (header "Template:"
-          (combine-scores (weights* 1.0 '(*) (check-template/types-internal types defn)))))
+    (combine-scores (weights* 1.0 '(*) (check-template/types-internal types defn)))))
+
+(define (check-questions/types types defn)
+  (for ([type types]) (ensure-type-is-well-formed type))
+  (header "Template:"
+    (combine-scores (weights* 1.0 '(*) (check-template/types-internal types defn 'questions)))))
 
 (define (check-template/body sub-defn sol-defn)
   (rubric-item 'template (check-template-bodies sub-defn sol-defn #t) "Template"))
@@ -415,7 +407,7 @@
 
   (let ([legal-options '(bodies questions nrs nhs nmrs)])
     (for ([option options])
-      (unless (memq options legal-options)
+      (unless (memq option legal-options)
         (error* "Illegal option to check-template/types-internal ~a." option))))
   
   (let ([params (cdadr defn)])      
