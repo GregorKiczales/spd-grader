@@ -429,7 +429,7 @@ validity, and test thoroughness results are reported. No grade information is re
                               sexps)]
          [primary-defn (findf (lambda (x) (eq? (fn-defn-name x) primary-name)) defns)]
          [defn-names   (map fn-defn-name defns)]
-         [called-names (remove* primary-name (called-fn-names primary-defn))]
+         [called-names (remove* (list primary-name) (called-fn-names primary-defn))]
          [helper-names (filter (lambda (name) (memq name called-names)) defn-names)]
          [helper-name  (and (pair? helper-names) (car helper-names))]
          [helper-defn  (findf (lambda (x) (eq? (fn-defn-name x) helper-name)) defns)])
