@@ -397,6 +397,45 @@ validity, and test thoroughness results are reported. No grade information is re
                (header (format "~a: " (car (context)))
                  (weights (*) item ...)))))]))
 
+;; find helper name and defn such that:
+;;  primary function definition exists
+;;  primary and helper have @htdf tags
+;;  primary calls helper
+;;  helper function definition exists
+(define-syntax (grade-helper stx)
+  (syntax-case stx ()
+    [(_ [(helper-name) n]  item ...)
+     #'(grade-helper-for [(helper-name _) n] item ...)]
+    [(_ [(helper-name helper-defn) n] item ...)
+     #'(begin ;recovery-point n !!!
+         (assert-context--@problem)
+         (let-values ([(helper-name helper-defn) (find-helper `n)])
+           (grade-prerequisite 'template-intact
+               "Helper must exist and primary function must call helper."
+               helper-name
+             ;; now we have a helper that we know is called and it has an @htdf
+             (header (format "(@htdf ~a) - helper for ~a: " helper-name 'n)
+               (parameterize ([context (cons (get-htdf* helper-name) (context))])
+                 (weights (*) item ...))))))]))
+
+(define (find-helper primary-name)
+  (let* ([problem     (car (context))]
+         [sexps       (tag-sexps problem)]
+         [htdf-tags   (problem-htdfs problem)]
+         [tag-names   (map cadr htdf-tags)]
+         [defns       (filter (lambda (x)
+                                (and (fn-defn? x)                        
+                                     (memq (fn-defn-name x) tag-names)))
+                              sexps)]
+         [primary-defn (findf (lambda (x) (eq? (fn-defn-name x) primary-name)) defns)]
+         [defn-names   (map fn-defn-name defns)]
+         [called-names (remove primary-name (called-fn-names primary-defn))]
+         [helper-names (filter (lambda (name) (memq name called-names)) defn-names)]
+         [helper-name  (and (pair? helper-names) (car helper-names))]
+         [helper-defn  (findf (lambda (x) (eq? (fn-defn-name x) helper-name)) defns)])
+
+    (values helper-name helper-defn)))
+
 (define-syntax (grade-bb-handler stx)
   (syntax-case stx ()
     [(_ (option handler-name) item ...) #'(grade-bb-handler (option handler-name _) item ...)]
