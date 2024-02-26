@@ -420,15 +420,15 @@ validity, and test thoroughness results are reported. No grade information is re
 
 (define (find-helper primary-name)
   (let* ([problem     (car (context))]
-         [sexps       (tag-sexps problem)]
          [htdf-tags   (problem-htdfs problem)]
          [tag-names   (map cadr htdf-tags)]
+         [sexps       (tag-sexps problem)]
          [defns       (filter (lambda (x)
                                 (and (fn-defn? x)                        
                                      (memq (fn-defn-name x) tag-names)))
                               sexps)]
-         [primary-defn (findf (lambda (x) (eq? (fn-defn-name x) primary-name)) defns)]
          [defn-names   (map fn-defn-name defns)]
+         [primary-defn (findf (lambda (x) (eq? (fn-defn-name x) primary-name)) defns)]
          [called-names (remove* (list primary-name) (called-fn-names primary-defn))]
          [helper-names (filter (lambda (name) (memq name called-names)) defn-names)]
          [helper-name  (and (pair? helper-names) (car helper-names))]
