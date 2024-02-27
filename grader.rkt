@@ -534,13 +534,13 @@ validity, and test thoroughness results are reported. No grade information is re
 
 (define-syntax (grade-tests-validity stx)
   (syntax-case stx ()
-    [(_ (p ...) r check ...)
-     #'(grade-tests-validity* (list `p ... `r) `(check ...))]))
+    [(_   (p ...) r check ...) #'(grade-tests-validity* 1 (list `p ... `r) `(check ...))]
+    [(_ n (p ...) r check ...) #'(grade-tests-validity* n (list `p ... `r) `(check ...))]))
 
-(define (grade-tests-validity* params checks)
+(define (grade-tests-validity* n params checks)
   (assert-context--@htdf)
   (let* ([htdf    (car (context))]
-         [fn-name (list-ref (htdf-names htdf) 0)]
+         [fn-name (list-ref (htdf-names htdf) (sub1 n))]
          [tests   (get-function-tests fn-name)])
     (check-validity fn-name tests params checks)))
 
