@@ -42,17 +42,9 @@
 (define-syntax (grade-questions-intact stx)
   (syntax-case stx ()
     [(_ fn x1 ...)
-     #'(grade-questions-intact* fn `(x1 ...))
-    #;
-
-     #'(grade-questions-intact*/body fn
-                                     `(param ...)
-                                     `(qa-pair ...))]))
+     #'(grade-questions-intact* fn `(x1 ...))]))
 
 
-
-;;!!! this should have a form that takes the type, calling back to check-template/types-internal
-;;
 (define (grade-questions-intact* fn-defn lox)  
   (let* ([fn-name (and (fn-defn? fn-defn) (caadr fn-defn))]
          [what (format "~a - cond questions intact:" fn-name)])
@@ -60,6 +52,7 @@
                                (if (type? (car lox))
                                    (header "cond questions intact"
                                      (check-questions/types lox fn-defn))
+                                   ;; !!! still need to clean this up, should it call check-template/body ?
                                    (rubric-item 'template-intact
                                                 (and (fn-defn? fn-defn)
                                                      (filled? fn-defn)
@@ -73,14 +66,14 @@
 
 (define-syntax (grade-nr-intact stx)
   (syntax-case stx ()
-    [(_ fn-name)
-     #'(grade-nr-intact fn-name 1)]
+    [(_ fn-name) #'(grade-nr-intact fn-name 1)]
     [(_ fn-name n)
      #'(let ([what (format "~a - natural recursion intact" 'fn-name)])
          (guard-template-fn-grading fn-name 'template-intact what
                                     (rubric-item 'template-intact
                                                  (filled-and-calls? fn-name 'fn-name n)
                                                  what)))]))
+
 
 (define-syntax (grade-mr-intact stx)
   (syntax-case stx ()

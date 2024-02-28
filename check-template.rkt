@@ -30,8 +30,12 @@
          check-dd-rules
          check-dd-template
          check-template/types
-         check-questions/types
          check-template/body
+         
+         check-questions/types
+         check-nrs/types
+         check-nhs/types
+         check-nmrs/types
          
          grade-template-intact
 
@@ -154,10 +158,22 @@
   (header "Template:"
     (combine-scores (weights* 1.0 '(*) (check-template/types-internal types defn)))))
 
-(define (check-questions/types types defn)
+
+;; !!! these still need to use 'template-intact rubric item kind
+(define (check-questions/types types defn) (check-template-parts/types types defn 'check-questions/types 'allow-one-arg 'questions))
+;; !!! these are not nearly ready to work because they depend on the call having the field selector directly inside of it
+(define (check-nrs/types       types defn) (check-template-parts/types types defn 'check-nrs/types       'allow-one-arg 'nrs))
+(define (check-nhs/types       types defn) (check-template-parts/types types defn 'check-nhs/types       'allow-one-arg 'nhs))
+(define (check-nmrs/types      types defn) (check-template-parts/types types defn 'check-nmrs/types      'allow-one-arg 'nmrs))
+
+(define (check-template-parts/types types defn who . options)
+  (when (> (length types) 1)
+    (error* "~a called with more than one type." who))
   (for ([type types]) (ensure-type-is-well-formed type))
-  (header "Template:"
-    (combine-scores (weights* 1.0 '(*) (check-template/types-internal types defn 'questions)))))
+  (combine-scores (weights* 1.0 '(*)
+                            (apply check-template/types-internal types defn options))))
+
+
 
 (define (check-template/body sub-defn sol-defn)
   (rubric-item 'template (check-template-bodies sub-defn sol-defn #t) "Template"))
@@ -336,27 +352,27 @@
           [(self-ref? ft)
            (tally 'nrs (contains-exp? `(,sel ,(primary-param)) subx) "selector ~a" `(,sel ,(primary-param)))
            (tally 'nrs (and (pair? subx)
-                              (>= (length subx) 2)
-                              (eqv? (car subx) (fn-name)) ;NR
-                              (equal-sets? `((,sel ,(primary-param)) ,@(additional-params))
-                                           (cdr subx)))
+                            (>= (length subx) 2)
+                            (eqv? (car subx) (fn-name)) ;calls (fn-name) is NR
+                            (equal-sets? `((,sel ,(primary-param)) ,@(additional-params))
+                                         (cdr subx)))
                   "natural recursion on result of selector ~a" subx)]
           [(ref? ft)
            (tally 'nhs (contains-exp? `(,sel ,(primary-param)) subx) "selector ~a" `(,sel ,(primary-param)))
            (tally 'nhs (and (pair? subx)
                             (>= (length subx) 2)
-                            (eqv? (car subx) (cadr ft)) ;NH/MR
+                            (eqv? (car subx) (cadr ft))       ;cadr of (ref fn-for-foo), only works in template, not real fn
                             (equal-sets? `((,sel ,(primary-param)) ,@(additional-params))
                                          (cdr subx)))
-                  "natural helper/mutual-recursion on result of selector ~a" subx)]
+                  "natural helper on result of selector ~a" subx)]
           [(mref? ft)
            (tally 'nmrs (contains-exp? `(,sel ,(primary-param)) subx) "selector ~a" `(,sel ,(primary-param)))
            (tally 'nmrs (and (pair? subx)
                              (>= (length subx) 2)
-                             (eqv? (car subx) (cadr ft)) ;NH/MR
+                             (eqv? (car subx) (cadr ft))
                              (equal-sets? `((,sel ,(primary-param)) ,@(additional-params))
-                                          (cdr subx)))
-                  "natural helper/mutual-recursion on result of selector ~a" subx)]))
+                                          (cdr subx)))        ;cadr of (mref fn-for-foo), only works in template, not real fn
+                  "natural mutual-recursion on result of selector ~a" subx)]))
   
   
   ;; can't have bare self-ref or ref as a field type because we don't know how to form the predicate
@@ -405,19 +421,23 @@
 
 
 
-  (let ([legal-options '(bodies questions nrs nhs nmrs)])
+  (let ([legal-options '(allow-one-arg bodies questions nrs nhs nmrs)])
     (for ([option options])
       (unless (memq option legal-options)
         (error* "Illegal option to check-template/types-internal ~a." option))))
+
+  (when (> (length (filter (compose not atomic?) types)) 1)
+    (error* "More than one type is non-atomic ~a" types))
+
   
   (let ([params (cdadr defn)])      
-    (cond [(< (length params) (length types)) (list (rubric-item 'template #f "Template function has too few parameters."))]
-          [(> (length params) (length types)) (list (rubric-item 'template #f "Template function has too many parameters."))]
-          [(> (length (filter (compose not atomic?) types)) 1)
-           (error 'check-template/types "More than one type is non-atomic ~a" types)]
+    (cond [(and (not (= (length params) (length types)))
+                (not (memq 'allow-one-arg options))
+                (not (= (length params) 1)))
+           (list (rubric-item 'template #f "Incorrect number of parameters."))]
           [else
            (fn-name (caadr defn))
-             
+           
            (parameterize ([primary-type #f]
                           [primary-param #f]
                           [additional-params '()])
