@@ -21,9 +21,9 @@
 
 (struct %typedef (name fn-for-t type))
 
-(define typdef?             %typdef)
+(define typdef?             %typedef?)
 
-(define typedef-name        %typdef-name)
+(define typedef-name        %typedef-name)
 (define typedef-fn-for-t    %typedef-fn-for-t)
 (define typedef-type        %typedef-type)
 
