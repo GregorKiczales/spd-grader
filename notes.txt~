@@ -1,0 +1,47 @@
+
+
+(define Tree
+  (compound (String (mref ListOfBranch fn-for-lob))
+            make-tree tree?
+            (tree-name tree-branches)))
+
+(define Branch
+  (compound (Natural (mref Tree fn-for-t))
+            make-branch branch?
+            (branch-num branch-tree)))
+
+(define ListOfBranch
+  (one-of empty
+          (compound ((mref Branch fn-for-branch) (sref ListOfBranch fn-for-lob))
+                    cons cons?
+                    (first rest))))
+
+
+(define Tree
+  (compound Tree fn-for-t
+            (String ListOfBranch)
+            make-tree tree?
+            (tree-name tree-branches)))
+
+expands to:
+
+(define Tree
+  (%compound 'Tree 'fn-for-t
+             '(String ListOfBranch)
+             (lambda () (list String ListOfBranch))
+             'make-tree 'tree? '(tree-name tree-branches)))
+
+and then refs, sref and mrefs are reconstructed automatically
+
+
+
+(define Branch
+  (compound (Natural (mref Tree fn-for-t))
+            make-branch branch?
+            (branch-num branch-tree)))
+
+(define ListOfBranch
+  (one-of empty
+          (compound ((mref Branch fn-for-branch) (sref ListOfBranch fn-for-lob))
+                    cons cons?
+                    (first rest))))
