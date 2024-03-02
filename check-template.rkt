@@ -489,6 +489,7 @@
           [else
            (and (= (length sub) (length sol))  ;compare expressions
                 (andmap walk sub sol))]))
+  
   (with-handlers ([void (lambda (e) #f)])    
     (walk (caddr sub0) (caddr sol0))))
 
@@ -645,7 +646,7 @@
     (assert-context--@htdf)
     (let* ([htdf   (car (context))]
            [defns  (htdf-defns htdf)])
-      (cond [(<= (length defns) (sub1 n))
+      (cond [(not (<= 1 n (length defns)))
              (rubric-item 'template-intact #f
                           "Template intact: incorrect - could not find ~a function definition in ~a" (number->ordinal* n) htdf)]
             [else
