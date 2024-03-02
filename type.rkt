@@ -3,50 +3,37 @@
 (require "defs.rkt"
          spd/constants)
 
-(provide (all-defined-out))
+(provide (all-defined-out)
+         (except-out (struct-out %type-expr))
+         (except-out (struct-out %atomic-nd))
+         (except-out (struct-out %atomic-d))
+         (except-out (struct-out %one-of))
+         (except-out (struct-out %compound))
+         (except-out (struct-out %sref))
+         (except-out (struct-out %ref))
+         (except-out (struct-out %mref)))
 
-#|
+;;
+;; The underlying types have % names because we use syntax rather than the built-in constructors
+;; to construct them. #:constructor-name doesn't solve the problem because struct binds the
+;; structure metadata to the structure name.
+;;
+(struct %type-expr ()
+  #:methods gen:custom-write [(define write-proc (lambda (t p m) (type-expr-print t p m)))])
 
-(define Cat  (typedef Cat fn-for-cat String))
+(struct %atomic-nd %type-expr (name))
+(struct %atomic-d  %type-expr (value))
+(struct %one-of    %type-expr (subclasses))
+(struct %compound  %type-expr (field-types constructor predicate selectors))
+(struct %sref      %type-expr (type-name fn-for-t))
+(struct  %ref      %type-expr (type-name fn-for-t))
+(struct %mref      %type-expr (type-name fn-for-t))
 
-(define Pos  (typedef Pos fn-for-pos (compound (Integer Integer) make-pos pos? (pos-x pos-y))))
-
-(define Tree (typedef Tree fn-for-tree (compound (String Tree) make-tree tree? (pos-name pos-subs))))
-
-(define ListOfTree (make-listof-type 'ListOfTree 'fn-for-lot Tree)) ;
-
-(define ListOfTree (typedef ListOfTree fn-for-lot (listof Tree)))
-
-|#
-
-(struct %typedef (name fn-for-t type))
-
-(define typdef?             %typedef?)
-
-(define typedef-name        %typedef-name)
-(define typedef-fn-for-t    %typedef-fn-for-t)
-(define typedef-type        %typedef-type)
-
-(define-syntax (typedef stx)
-  (syntax-case stx ()
-    [(_ name fn-for-t type) #'(%typedef-type 'name 'fn-for-t type)]))
-  
-
-
-(struct type ()
-  #:methods gen:custom-write [(define write-proc (lambda (t p m) (type-print t p m)))])
-
-(struct %atomic-nd type (name))
-(struct %atomic-d  type (value))
-(struct %one-of    type (subclasses))
-(struct %compound  type (field-types constructor predicate selectors))
-
-(struct %sref (type-name fn-for-t))  ;these are not types in and of themselves
-(struct  %ref (type-name fn-for-t))  ;they just serve to render explicit what
-(struct %mref (type-name fn-for-t))  ;kind of reference the bare name represents
-
-
-
+;;
+;; Now we essentially export what we want, define a few extras, and define a constructor functions and
+;; constructor macros that make calls to the constructors look better and also ensure we only produce
+;; well-formed type exprs.
+;;
 
 (define (atomic? x)
   (or (atomic-nd? x) (atomic-d? x)))
@@ -73,16 +60,20 @@
 (define mref-type-name       %mref-type-name)
 (define mref-fn-for-t        %mref-fn-for-t)
 
+;;
+;; Constructors
+;;
+
 (define (atomic-nd name)  (%atomic-nd name))
 (define (atomic-d  value) (%atomic-d  value))
 
 (define (one-of . subclasses)
-  (%one-of (parse-referred-to-types subclasses #t)))
+  (%one-of (parse-referred-to-types subclasses "one-of subclasses" #f #t #f)));!!! is last one really #f
 
 (define-syntax (compound stx)
   (syntax-case stx ()
     [(_ (ft ...) constructor predicate (sel ...))
-     #'(%compound (parse-referred-to-types (list ft ...) #f)
+     #'(%compound (parse-referred-to-types (list ft ...) "compound field types" #f #f #t)
                   'constructor 'predicate
                   '(sel ...))]))
 
@@ -90,17 +81,20 @@
 (define-syntax (ref  stx) (syntax-case stx () [(_ type-name fn-for-t) #'(%ref  'type-name 'fn-for-t)]))
 (define-syntax (mref stx) (syntax-case stx () [(_ type-name fn-for-t) #'(%mref 'type-name 'fn-for-t)]))
 
-(define (parse-referred-to-types lox allow-bare?)
+;;
+;; any kind of reference to a non-primitive named type has to be explicitly
+;; inside of a ref/sref/mref
+;;
+(define (parse-referred-to-types lox who allow-one-of? allow-compound? allow-ref?)
   (map (lambda (x)
-         (cond [(string? x)                       (atomic-d x)]
-               [(memq x (list false empty true))  (atomic-d x)]
-               [(or (sref? x) (ref? x) (mref? x))           x]
-               [(primitive-type? x)                         x]
-               [(and allow-bare? (type? x))                 x]
-               [(type? x)
-                (error* "Bare reference to a type ~s." x)]
-               [else
-                (error* "Bad one-of subclass or compound field type ~s." x)]))
+         (cond [(or (string? x) (memq x (list false empty true)))  (atomic-d x)]
+               [(primitive-type? x)                 x]
+               
+               [(and allow-compound? (compound? x)) x]
+               [(and allow-one-of?   (one-of?   x)) x]
+               [(and allow-ref?      (or (sref? x) (ref? x) (mref? x))) x]
+               
+               [else (error* "~a cannot include ~s." who x)]))
        lox))
 
 
@@ -111,31 +105,20 @@
                            'cons 'cons?
                            '(first rest)))))
 
-(define (rule-kind t)
-  (cond [(atomic-d? t)  'atomic-distinct]
-        [(atomic-nd? t) 'atomic-non-distinct]
-        [(one-of? t)    'one-of]
-        [(compound? t)  'compound]
-        [(sref? t)      'self-ref]
-        [(ref?  t)      'ref]
-        [(mref? t)      'mref]
-        [else
-         (error* "unrecognized type expr ~a" t)]))
-
-(define (type-print type port mode)
+(define (type-expr-print type port mode)
   (let ([recur (case mode
                  [(#t) write]
                  [(#f) display]
                  [else display #;(lambda (p port) (print p port mode))])])
     (when mode (write-string "<Type " port))
-    (recur (type->type-expr type) port)
+    (recur (pretty-type-expr type) port)
     (when mode (write-string ">" port))))
 
-(define (type->type-expr t)
+(define (pretty-type-expr t)
   (cond [(atomic-nd? t) (atomic-nd-name t)]
         [(atomic-d?  t) (atomic-d-value t)]
-        [(one-of?    t) `(one-of                    ,@(map type->type-expr (one-of-subclasses t)))]
-        [(compound?  t) `(,(compound-constructor t) ,@(map type->type-expr (compound-field-types t)))]
+        [(one-of?    t) `(one-of                    ,@(map pretty-type-expr (one-of-subclasses t)))]
+        [(compound?  t) `(,(compound-constructor t) ,@(map pretty-type-expr (compound-field-types t)))]
 
         [(sref?      t) `(sref ,(sref-type-name t) ,(sref-fn-for-t t))]
         [(ref?       t) `(ref  ,(ref-type-name  t) ,(ref-fn-for-t  t))]
@@ -169,32 +152,3 @@
 (define ListOfImage   (make-listof-type 'ListOfImage   'fn-for-loi  Image))
 (define ListOfColor   (make-listof-type 'ListOfColor   'fn-for-loc  Color))
 (define ListOfScene   (make-listof-type 'ListOfScene   'fn-for-los  Scene))
-
-
-;; -> raise internal error if type is malformed
-;;
-;; In terms of static types, types look mutually recursive. But our well-formedness rules are far
-;; more restrictive:
-;;   one-of   can only contain compound and atomic*
-;;   compound can only contain ref* and atomic*
-;; nothing else contains anything
-;;
-(define (ensure-type-is-well-formed type)
-
-  (define (check ty in-one-of? in-compound?)
-    (cond [(atomic-nd? ty) #t]
-          [(atomic-d?  ty) (or       in-one-of?       in-compound?)] ;allowed in compound for things like (cons "L" Path)
-	  [(one-of?    ty) (and (not in-one-of?) (not in-compound?) (check-one-of   ty))]
-	  [(compound?  ty) (and                  (not in-compound?) (check-compound ty in-one-of?))]
-
-          [(sref?      ty)                            in-compound?]  ;these three are syntactically leaves
-          [(ref?       ty)                            in-compound?]  ;so they enclose nothing
-          [(mref?      ty)                            in-compound?]  ;
-	  [else
-	   (error* "unrecognized type ~a" ty)]))
-
-  (define (check-one-of   ty)            (andmap (lambda (t) (check t #t         #f)) (one-of-subclasses    ty)))
-  (define (check-compound ty in-one-of?) (andmap (lambda (t) (check t in-one-of? #t)) (compound-field-types ty)))
-
-  (unless (check type #f #f)
-    (error* "Type is not well formed: ~a" type)))

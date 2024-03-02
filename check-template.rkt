@@ -152,18 +152,15 @@
 
 
 (define (check-dd-rules type rules)
-  (ensure-type-is-well-formed type)
   (header "DD template rules:"
           (combine-scores (weights* 1.0 '(*) (check-dd-rules-internal type rules)))))
 
 (define (check-dd-template type defn)
-  (ensure-type-is-well-formed type)
   (header "DD template:"
           (combine-scores (weights* 1.0 '(*) (check-template/types-internal (list type) defn)))))
 
 
 (define (check-template/types types defn)
-  (for ([type types]) (ensure-type-is-well-formed type))
   (header "Template:"
     (combine-scores (weights* 1.0 '(*) (check-template/types-internal types defn)))))
 
@@ -178,7 +175,6 @@
 (define (check-template-parts/types types defn who . options)
   (when (> (length types) 1)
     (error* "~a called with more than one type." who))
-  (for ([type types]) (ensure-type-is-well-formed type))
   (combine-scores (weights* 1.0 '(*)
                             (apply check-template/types-internal types defn options))))
 
@@ -501,7 +497,18 @@
 
 ;;
 ;; Helpers
-;; 
+;;
+
+(define (rule-kind t)
+  (cond [(atomic-d? t)  'atomic-distinct]
+        [(atomic-nd? t) 'atomic-non-distinct]
+        [(one-of? t)    'one-of]
+        [(compound? t)  'compound]
+        [(sref? t)      'self-ref]
+        [(ref?  t)      'ref]
+        [(mref? t)      'mref]
+        [else
+         (error* "unrecognized type expr ~a" t)]))
 
 (define (boolean-value? x) (memq x '(true false)))
 
