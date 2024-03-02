@@ -1,0 +1,59 @@
+
+
+(define Tree
+  (compound (String (mref ListOfBranch fn-for-lob))
+            make-tree tree?
+            (tree-name tree-branches)))
+
+(define Branch
+  (compound (Natural (mref Tree fn-for-t))
+            make-branch branch?
+            (branch-num branch-tree)))
+
+(define ListOfBranch
+  (one-of empty
+          (compound ((mref Branch fn-for-branch) (sref ListOfBranch fn-for-lob))
+                    cons cons?
+                    (first rest))))
+
+
+(define Tree
+  (typedef Tree
+           (compound Tree fn-for-t
+                     (String ListOfBranch)
+                     make-tree tree?
+                     (tree-name tree-branches))))
+
+expands to:
+
+(define Tree
+  (typedef Tree fn-for-tree
+           (%compound '(String ListOfBranch)
+                      (lambda () (list String ListOfBranch))
+                      'make-tree 'tree?
+                      '(tree-name tree-branches))))
+
+(typedef-name Tree) -> 'Tree
+(typedef-type Tree) -> #<Type (compound ..)
+
+(one-of-subclasses/compound-field-types  -> (list #<TypeDef String> #<TypeDef (one-of ...)> distinct, primitive ...)
+
+(one-of-type-references/compound-type-references -> '(primitive mref) ;automatically constructed
+
+
+(type-def-name        Tree) -> 'Tree
+(type-def-fn-for-name Tree) -> 'fn-for-tree
+
+
+
+
+(define Branch
+  (compound (Natural (mref Tree fn-for-t))
+            make-branch branch?
+            (branch-num branch-tree)))
+
+(define ListOfBranch
+  (one-of empty
+          (compound ((mref Branch fn-for-branch) (sref ListOfBranch fn-for-lob))
+                    cons cons?
+                    (first rest))))

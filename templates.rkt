@@ -8,6 +8,7 @@
 (provide grade-encapsulated-template-fns
 
          grade-questions-intact
+         grade-questions-intact/body
          grade-nr-intact grade-mr-intact grade-nh-intact
          grade-try-catch grade-no-try-catch
          grade-accumulator-intact
@@ -39,28 +40,35 @@
               body])]))
 
 
-(define-syntax (grade-questions-intact stx)
+(define (grade-questions-intact fn-defn type)
+  (grade-questions-intact/types* fn-defn (list type)))
+
+(define-syntax (grade-questions-intact/body stx)
   (syntax-case stx ()
-    [(_ fn x1 ...)
-     #'(grade-questions-intact* fn `(x1 ...))]))
+    [(_ fn-defn (p ...) body)
+     #'(grade-questions-intact/body* fn-defn `(p ...) `body)]))
 
 
-(define (grade-questions-intact* fn-defn lox)  
+(define (grade-questions-intact/types* fn-defn types)
   (let* ([fn-name (and (fn-defn? fn-defn) (caadr fn-defn))]
          [what (format "~a - cond questions intact:" fn-name)])
     (guard-template-fn-grading fn-name 'template-intact what
-                               (if (type? (car lox))
-                                   (header "cond questions intact"
-                                     (check-questions/types lox fn-defn))
-                                   ;; !!! still need to clean this up, should it call check-template/body ?
-                                   (rubric-item 'template-intact
-                                                (and (fn-defn? fn-defn)
-                                                     (filled? fn-defn)
-                                                     (let [(cond-expr (get-cond fn-defn))]
-                                                       (and (list? cond-expr)
-                                                            (equal? (map car (cdr cond-expr))
-                                                                    (map car (cdr (cadr lox)))))))
-                                                what)))))
+                               (header "cond questions intact"
+                                 (check-questions/types types fn-defn)))))
+
+(define (grade-questions-intact/body* fn-defn params body)  
+  (let* ([fn-name (and (fn-defn? fn-defn) (caadr fn-defn))]
+         [what (format "~a - cond questions intact:" fn-name)])
+    (guard-template-fn-grading fn-name 'template-intact what
+                               ;; !!! still need to clean this up, should it call check-template/body ?
+                               (rubric-item 'template-intact
+                                            (and (fn-defn? fn-defn)
+                                                 (filled? fn-defn)
+                                                 (let [(cond-expr (get-cond fn-defn))]
+                                                   (and (list? cond-expr)
+                                                        (equal? (map car (cdr cond-expr))
+                                                                (map car (cdr body))))))
+                                            what))))
 
 
 

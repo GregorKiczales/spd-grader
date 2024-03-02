@@ -26,6 +26,7 @@
          grade-dd-rules
          grade-dd-template
          grade-template
+         grade-template/body
          
          check-dd-rules
          check-dd-template
@@ -59,18 +60,18 @@
 
 (define-syntax (grade-dd-rules-and-template stx)
   (syntax-case stx ()
-    [(_   type) #'(grade-dd-rules-and-template* 1 `type)]
-    [(_ n type) #'(grade-dd-rules-and-template* n `type)]))
+    [(_   type) #'(grade-dd-rules-and-template* 1 type)]
+    [(_ n type) #'(grade-dd-rules-and-template* n type)]))
 
 (define-syntax (grade-dd-rules stx)
   (syntax-case stx ()
-    [(_   type) #'(grade-dd-rules* 1 `type)]
-    [(_ n type) #'(grade-dd-rules* n `type)]))
+    [(_   type) #'(grade-dd-rules* 1 type)]
+    [(_ n type) #'(grade-dd-rules* n type)]))
 
-(define-syntax (grade-dd-template stx)             ;used in m06 after
-  (syntax-case stx ()                              ;@dd-template-rules
-    [(_   type) #'(grade-dd-template* 1 `type)]    ;is not required
-    [(_ n type) #'(grade-dd-template* n `type)]))
+(define-syntax (grade-dd-template stx)            ;used in m06 after
+  (syntax-case stx ()                             ;@dd-template-rules
+    [(_   type) #'(grade-dd-template* 1 type)]    ;is not required
+    [(_ n type) #'(grade-dd-template* n type)]))
 
 
 ;; 
@@ -87,21 +88,21 @@
 ;; But for cases like large enums where the template isn't formed simply from the rules
 ;; we have this ability to specifically write out the template.
 ;;
-;; (grade-template (ws x y me) (cond [(mou...) (... (ball-x ws) ]))
+;; (grade-template/body (ws x y me) (cond [(mou...) (... (ball-x ws) ]))
 ;;
-(define-syntax (grade-template stx)
-  ;; Have to call a single function rather than distinguishing the different forms here
-  ;; in the macro because otherwise we need a fender expression in the syntax-case, and
-  ;; that conflicts with the way we use , in some calls to the grade-... macros.
-  (syntax-case stx (define)
-    [(_ x1 ...) #'(grade-template* `(x1 ...))]))
+(define (grade-template . types)
+  (grade-template/types* types))
+
+(define-syntax (grade-template/body stx)
+  (syntax-case stx ()
+    [(_ (p ...) body) #'(grade-template/body*  `(p ...) `body)]))
 
 
 (define (grade-dd-rules-and-template* n type)
   (recovery-point grade-dd-rules-and-template
     (assert-context--@htdd)
     (weights (.3 *)
-      (grade-dd-rules*    n type)
+      (grade-dd-rules*    n type)      
       (grade-dd-template* n type))))
 
 (define (grade-dd-rules* n type)
@@ -127,34 +128,39 @@
                        "DD template: could not find template function definition in (@htdd ~a)" dd-name)
           (check-dd-template type defn)))))
 
-
-(define (grade-template* args)
+(define (grade-template/types* lot)
   (recovery-point grade-template
     (assert-context--@htdf)
     (let* ([htdf (car (context))]
            [defn (find-template-in-@template 1)])
       (cond [(not defn) 
              (rubric-item 'template #f "Template: could not find @template tag in ~a" htdf)]
-            [(type? (car args)) (check-template/types args defn)]
-            [else               (check-template/body defn `(define (fn-for ,@(car args)) ,(cadr args)))]))))
+            [else (check-template/types lot defn)]))))
+
+(define (grade-template/body* params body)
+  (recovery-point grade-template
+    (assert-context--@htdf)
+    (let* ([htdf (car (context))]
+           [defn (find-template-in-@template 1)])
+      (cond [(not defn) 
+             (rubric-item 'template #f "Template: could not find @template tag in ~a" htdf)]
+            [else
+             (check-template/body defn `(define (fn-for ,@params) ,body))]))))
 
 
 
 
 
 (define (check-dd-rules type rules)
-  (ensure-type-is-well-formed type)
   (header "DD template rules:"
           (combine-scores (weights* 1.0 '(*) (check-dd-rules-internal type rules)))))
 
 (define (check-dd-template type defn)
-  (ensure-type-is-well-formed type)
   (header "DD template:"
           (combine-scores (weights* 1.0 '(*) (check-template/types-internal (list type) defn)))))
 
 
 (define (check-template/types types defn)
-  (for ([type types]) (ensure-type-is-well-formed type))
   (header "Template:"
     (combine-scores (weights* 1.0 '(*) (check-template/types-internal types defn)))))
 
@@ -169,7 +175,6 @@
 (define (check-template-parts/types types defn who . options)
   (when (> (length types) 1)
     (error* "~a called with more than one type." who))
-  (for ([type types]) (ensure-type-is-well-formed type))
   (combine-scores (weights* 1.0 '(*)
                             (apply check-template/types-internal types defn options))))
 
@@ -194,9 +199,10 @@
                                 (foldr append '()
                                        (map (lambda (t2)
                                               (type->rules t2 #f #t))
-                                            (compound-fts ty))))]
-          [(self-ref? ty) '(self-ref)]
-          [(ref?      ty) '(ref)]
+                                            (compound-field-types ty))))]
+          [(sref? ty) '(self-ref)]
+          [(ref?  ty) '(ref)]
+          [(mref? ty) '(ref)]
           [else
            (error* "unrecognized type ~a" ty)]))
   
@@ -218,8 +224,8 @@
                  ;;  - this sub is incorrect, but next sub is this sol (insert one)
                  [(and (>= (length sol) 2)
                        (>= (length sub) 2)
-                       (eqv? (car sol) (cadr sub))
-                       (eqv? (cadr sol) (car sub)))
+                       (eqv? (car  sol) (cadr sub))
+                       (eqv? (cadr sol) (car  sub)))
                   (list* (tally #f "~a and ~a are swapped in order, 1 marked wrong." (car sol) (cadr sol))
                          (tally #f "~a and ~a are swapped in order, 1 marked right." (car sol) (cadr sol))
                          (check (cddr sol) (cddr sub)))]
@@ -265,17 +271,19 @@
                   scores))))
 
   (define (check ty expr [prefix ""])
-    (cond [(atomic? ty)
-           (let* ([nprefix (format "~a~a" (if (atomic-d? ty) "atomic distinct " "atomic non-distinct ") prefix)]
+    (cond [(atomic-nd? ty)
+           (let* ([nprefix (format "atomic non-distinct ~a" prefix)]
                   [expr (check-... expr nprefix)])
-             (when (atomic-nd? ty)
-               (tally 'bodies (and (pair? expr) (equal? (car expr) (primary-param))) "~a ~a" nprefix (primary-param))))]
+             (tally 'bodies (and (pair? expr) (equal? (car expr) (primary-param))) "~a ~a" nprefix (primary-param)))]
+          [(atomic-d? ty)
+           (check-... expr
+                      (format "atomic distinct ~a" prefix))]
           [(one-of?   ty)  (check-one-of   ty expr prefix)]
 	  [(compound? ty)  (check-compound ty expr prefix)]
           ;; Can only be inside compound
-          ;; [(self-ref?  ty) ...]
-          ;; [(ref?       ty) ...]
-          ;; [(mref?      ty) ...]
+          ;; [(sref?  ty) ...]
+          ;; [(ref?   ty) ...]
+          ;; [(mref?  ty) ...]
 	  [else
 	   (error* "unrecognized type ~a" ty)]))
 
@@ -323,7 +331,7 @@
   
 
   (define (check-compound t subx prefix)
-      (let loop [(fts   (compound-fts t))
+      (let loop [(fts   (compound-field-types t))
                  (sels  (compound-selectors t))
                  (subxs (check-... subx))]
         (cond [(and (empty? fts) (empty? subxs)) (void)]
@@ -344,16 +352,16 @@
     (cond [(atomic-d? ft)
            (tally 'bodies
                   (or (equal? subx `(,sel ,(primary-param)))
-                      (equal? subx ft)
+                      (equal? subx (atomic-d-value ft))
                       (equal? subx '(...)))
                   "selector ~a" subx)]
           [(atomic-nd? ft)
            (tally 'bodies (equal? subx `(,sel ,(primary-param))) "selector ~a" subx)]
-          [(self-ref? ft)
+          [(sref? ft)
            (tally 'nrs (contains-exp? `(,sel ,(primary-param)) subx) "selector ~a" `(,sel ,(primary-param)))
            (tally 'nrs (and (pair? subx)
                             (>= (length subx) 2)
-                            (eqv? (car subx) (fn-name)) ;calls (fn-name) is NR
+                            (eqv? (car subx) (fn-name))             ;calls (fn-name) is NR
                             (equal-sets? `((,sel ,(primary-param)) ,@(additional-params))
                                          (cdr subx)))
                   "natural recursion on result of selector ~a" subx)]
@@ -361,7 +369,7 @@
            (tally 'nhs (contains-exp? `(,sel ,(primary-param)) subx) "selector ~a" `(,sel ,(primary-param)))
            (tally 'nhs (and (pair? subx)
                             (>= (length subx) 2)
-                            (eqv? (car subx) (cadr ft))       ;cadr of (ref fn-for-foo), only works in template, not real fn
+                            (eqv? (car subx) (ref-fn-for-t ft))      ;only works in template, not real fn
                             (equal-sets? `((,sel ,(primary-param)) ,@(additional-params))
                                          (cdr subx)))
                   "natural helper on result of selector ~a" subx)]
@@ -369,9 +377,9 @@
            (tally 'nmrs (contains-exp? `(,sel ,(primary-param)) subx) "selector ~a" `(,sel ,(primary-param)))
            (tally 'nmrs (and (pair? subx)
                              (>= (length subx) 2)
-                             (eqv? (car subx) (cadr ft))
+                             (eqv? (car subx) (mref-fn-for-t ft))    ;only works in template, not real fn
                              (equal-sets? `((,sel ,(primary-param)) ,@(additional-params))
-                                          (cdr subx)))        ;cadr of (mref fn-for-foo), only works in template, not real fn
+                                          (cdr subx)))      
                   "natural mutual-recursion on result of selector ~a" subx)]))
   
   
@@ -399,15 +407,15 @@
            (let* ([canon (canonicalize-question subx)])
              (tally 'questions (equal? canon (test t1)) "cond question ~s" subx))]
           [(compound? t1)
-           (if (and (ormap distinct-value? (compound-fts t1))
+           (if (and (ormap atomic-d? (compound-field-types t1))
                     (ormap (lambda (t2) (and (compound? t2)
                                              (eqv? (compound-predicate t1) (compound-predicate t2))))
                            rst))
-               (let* [(idx  (index-where (compound-fts t1) distinct-value?))
-                      (dft  (list-ref (compound-fts t1) idx))
-                      (dsel (list-ref (compound-selectors t1) idx))]
+               (let* [(idx  (index-where (compound-field-types t1) atomic-d?))
+                      (dft  (list-ref (compound-field-types t1) idx))
+                      (dsel (list-ref (compound-selectors t1) idx))]                          
                  (tally 'questions
-                        (equal?  `(,(equality-fn dft) (,dsel ,(primary-param)) ,dft)
+                        (equal?  `(,(equality-fn dft) (,dsel ,(primary-param)) ,(atomic-d-value dft))
                                  (canonicalize-question subx))
                         "cond question ~s"
                         subx))
@@ -426,7 +434,7 @@
       (unless (memq option legal-options)
         (error* "Illegal option to check-template/types-internal ~a." option))))
 
-  (when (> (length (filter (compose not atomic?) types)) 1)
+  (when (> (length (filter (lambda (x) (and (not (atomic-nd? x)) (not (atomic-d? x)))) types)) 1)
     (error* "More than one type is non-atomic ~a" types))
 
   
@@ -442,18 +450,19 @@
                           [primary-param #f]
                           [additional-params '()])
 
-             (cond [(andmap atomic? types)
+             (cond [(andmap (lambda (x) (or (atomic-nd? x) (atomic-d? x))) types)
                     (primary-type  (car types))
                     (primary-param (car (cdadr defn)))
                     (additional-params  (cdr (cdadr defn)))]
                    [else
                     (for ([type types]
                           [param params])
-                      (cond [(atomic? type) (additional-params (append (additional-params) (list param)))]
+                      (cond [(atomic-nd?   type) (additional-params (append (additional-params) (list param)))]
+                            [(atomic-d? type) (additional-params (append (additional-params) (list param)))]
                             [else
                              (primary-type type)
                              (primary-param param)]))])
-             
+
              (check (primary-type) (caddr defn))
              
              (reverse scores))])))
@@ -480,6 +489,7 @@
           [else
            (and (= (length sub) (length sol))  ;compare expressions
                 (andmap walk sub sol))]))
+  
   (with-handlers ([void (lambda (e) #f)])    
     (walk (caddr sub0) (caddr sol0))))
 
@@ -488,50 +498,66 @@
 
 ;;
 ;; Helpers
-;; 
+;;
 
+(define (rule-kind t)
+  (cond [(atomic-d? t)  'atomic-distinct]
+        [(atomic-nd? t) 'atomic-non-distinct]
+        [(one-of? t)    'one-of]
+        [(compound? t)  'compound]
+        [(sref? t)      'self-ref]
+        [(ref?  t)      'ref]
+        [(mref? t)      'mref]
+        [else
+         (error* "unrecognized type expr ~a" t)]))
 
-(define (distinct-value? x)
-  (or (number? x) (string? x) (member x '(true false empty))))
-
-(define (boolean-value? x) (member x '(true false)))
+(define (boolean-value? x) (memq x '(true false)))
 
 (define (guard t)
-  (cond [(string? t)     `(string? ,(primary-param))]
-        [(eqv? t 'false) `(false? ,(primary-param))]
-        [(eqv? t 'empty) `(empty? ,(primary-param))]        
-        [else (error* "Don't know how to guard ~a" t)]))
+  (let ([v (atomic-d-value t)])
+    (cond [(string? v)    `(string? ,(primary-param))]
+          [(eqv? v false) `(false? ,(primary-param))]
+          [(eqv? v empty) `(empty? ,(primary-param))]        
+          [else (error* "Don't know how to guard distinct value ~a" v)])))
 
 (define (test t)
-  (cond [(string? t)      `(string=? ,(primary-param) ,t)]
-        [(eqv? t 'false)  `(false? ,(primary-param))]        
-        [(eqv? t 'empty)  `(empty? ,(primary-param))]
-        [(compound? t)    `(,(compound-predicate t) ,(primary-param))]
-        [else
-         (case t
-           [(Number Integer Natural) `(number?  ,(primary-param))]
-           [(String)                 `(string?  ,(primary-param))]
-           [(Image)                  `(image?   ,(primary-param))]
-           [(Boolean)                `(boolean? ,(primary-param))])]))
+  (if (atomic-d? t)
+      (let ([v (atomic-d-value t)])
+        (cond [(string? v)      `(string=? ,(primary-param) ,v)]
+              [(eqv? v 'false)  `(false? ,(primary-param))]        
+              [(eqv? v 'empty)  `(empty? ,(primary-param))]))
+      (cond [(compound? t)                          `(,(compound-predicate t) ,(primary-param))]
+            [(memq t (list Number Integer Natural)) `(number?  ,(primary-param))]
+            [(eqv? t String)                        `(string?  ,(primary-param))]
+            [(eqv? t Image)                         `(image?   ,(primary-param))]
+            [(eqv? t Boolean)                       `(boolean? ,(primary-param))]
+            [else
+             (error* "Don't know how to test ~a" t)])))
 
 
 (define (same-type? t1 t2)
-  (cond [(not (distinct-value? t1)) (error* "first arg to same-type? must be distinct value ~a" t1)]
-        [(number?  t1)       (or (number? t2) (member t2 '(Number Integer Natural)))]
-        [(string?  t1)       (or (string? t2) (eqv? t2 'String))]
-        [(image?   t1)       (error* "bad type, distinct value should not be an image ~a" t1)]
-        [(boolean-value? t1) (or (boolean-value? t2) (eqv? t2 'Boolean))]
-        [(eqv? t1 'empty)    (eqv? t2 'empty)] ;what about list types?
-        [(compound? t1)      (error* "bad type, distinct values must be atomic " t1)]
-        [else false]))
+  (unless (atomic-d? t1)
+    (error* "first arg to same-type? must be distinct value ~a" t1))
+  (let ([v1 (atomic-d-value t1)])
+    (cond [(number?  v1)       (or (and (atomic-d? t2) (number? (atomic-d-value t2)))
+                                   (memq t2 (list Number Integer Natural)))]
+          [(string?  v1)       (or (and (atomic-d? t2) (string? (atomic-d-value t2)))
+                                   (eqv? t2 String))]
+          [(boolean-value? v1) (or (and (atomic-d? t2) (boolean-value? (atomic-d-value t2)))
+                                   (eqv? t2 Boolean))]
+          [(eqv? v1 'empty)    (and (atomic-d? t2) (eqv? t2 'empty))] ;what about list types?
+          [(image?    v1)      (error* "bad type, distinct value should not be an image ~a" t1)]
+         ;[(compound? v1)      (error* "bad type, distinct values must be atomic " t1)]
+          [else false])))
 
 
-(define (equality-fn dv)
-  (cond [(string? dv) 'string=?]
-        [(number? dv) '=]
-        [(boolean-value? dv) 'eqv?]
-        [else
-         (error* "Bad type given to check-type, distinct field of compound is not string, number or boolean.")]))
+(define (equality-fn dft)
+  (let ([dv (atomic-d-value dft)])
+    (cond [(string? dv) 'string=?]
+          [(number? dv) '=]
+          [(boolean-value? dv) 'eqv?]
+          [else
+           (error* "Bad type given to check-type, distinct field of compound is ~s." dv)])))
 
 (define (canonicalize-question subx)
   (cond [(pair? subx)
@@ -620,7 +646,7 @@
     (assert-context--@htdf)
     (let* ([htdf   (car (context))]
            [defns  (htdf-defns htdf)])
-      (cond [(<= (length defns) (sub1 n))
+      (cond [(not (<= 1 n (length defns)))
              (rubric-item 'template-intact #f
                           "Template intact: incorrect - could not find ~a function definition in ~a" (number->ordinal* n) htdf)]
             [else
@@ -637,23 +663,21 @@
 
 (module+ test
 
-  (define LON (make-listof-type 'Number 'fn-for-lon))
-
-  (define Cat '(compound (Integer Integer) make-cat cat? (cat-x cat-y)))
+  (define Cat (compound (list Integer Integer) 'make-cat 'cat? '(cat-x cat-y)))
   
   ;; top-level distinct (shouldn't actually happen, but forms a base case for testing)
-  (check-equal? (map score-m (check-dd-rules-internal "green"
+  (check-equal? (map score-m (check-dd-rules-internal (atomic-d "green")
                                                       '(atomic-distinct)))
                 '(1))
   
   ;; simple atomic-non-distinct
-  (check-equal? (map score-m (check-dd-rules-internal 'Number
+  (check-equal? (map score-m (check-dd-rules-internal Number
                                                       '(atomic-non-distinct)))
                 '(1))
   
   
   ;; String instead of Number
-  (check-equal? (map score-m (check-dd-rules-internal 'String
+  (check-equal? (map score-m (check-dd-rules-internal String
                                                       '(atomic-non-distinct)))
                 '(1))
   
@@ -665,56 +689,56 @@
   
   ;; self-ref (note this type isn't well-formed SR since no base case, but it does
   ;; follow the less stringent formedness rules this checker needs
-  (check-equal? (map score-m (check-dd-rules-internal '(compound (Integer (self-ref fn-for-cat))
-                                                                 make-cat cat?
-                                                                 (cat-x cat-foo))
+  (check-equal? (map score-m (check-dd-rules-internal (compound (list Integer (sref 'Cat 'fn-for-cat))
+                                                                'make-cat 'cat?
+                                                                '(cat-x cat-foo))
                                                       '(compound self-ref)))
                 '(1 1))
   
   
   ;; self-ref rule missing
-  (check-equal? (map score-m (check-dd-rules-internal '(compound (Integer (self-ref fn-for-cat))
-                                                                 make-cat cat?
-                                                                 (cat-x cat-foo))
+  (check-equal? (map score-m (check-dd-rules-internal (compound (list Integer (sref 'Cat 'fn-for-cat))
+                                                                'make-cat 'cat?
+                                                                '(cat-x cat-foo))
                                                       '(compound)))
                 '(1 0))
   
   
   ;; ref
-  (check-equal? (map score-m (check-dd-rules-internal '(compound (Integer (ref fn-for-foo))
-                                                                 make-cat cat?
-                                                                 (cat-x cat-foo))
+  (check-equal? (map score-m (check-dd-rules-internal (compound (list Integer (ref 'Foo 'fn-for-foo))
+                                                                'make-cat 'cat?
+                                                                '(cat-x cat-foo))
                                                       '(compound ref)))
                 '(1 1))
   
-  (check-equal? (map score-m (check-dd-rules-internal '(one-of String Number)
+  (check-equal? (map score-m (check-dd-rules-internal (one-of String Number)
                                                       '(one-of atomic-non-distinct atomic-non-distinct)))
                 '(1 1 1))
   
   
-  (check-equal? (map score-m (check-dd-rules-internal '(one-of "pre-launch" Number "post-flight")
+  (check-equal? (map score-m (check-dd-rules-internal (one-of "pre-launch" Number "post-flight")
                                                       '(one-of atomic-distinct
                                                                atomic-non-distinct
                                                                atomic-distinct)))
                 '(1 1 1 1))
   
-  (check-equal? (map score-m (check-dd-rules-internal '(one-of String Number)
+  (check-equal? (map score-m (check-dd-rules-internal (one-of String Number)
                                                       '(one-of atomic-non-distinct atomic-non-distinct)))
                 '(1 1 1))
   
-  ;; LON
-  (check-equal? (map score-m (check-dd-rules-internal LON
+  ;; ListOfNumber
+  (check-equal? (map score-m (check-dd-rules-internal ListOfNumber
                                                       '(one-of atomic-distinct compound self-ref)))
                 '(1 1 1 1))
   
   
-  (check-equal? (map score-m (check-dd-rules-internal '(one-of empty
-                                                               (compound ("L" (self-ref fn-for-path)) cons cons? (first rest))
-                                                               (compound ("R" (self-ref fn-for-path)) cons cons? (first rest)))
+  (check-equal? (map score-m (check-dd-rules-internal (one-of empty
+                                                              (compound (list "L" (sref 'Path 'fn-for-path)) 'cons 'cons? '(first rest))
+                                                              (compound (list "R" (sref 'Path 'fn-for-path)) 'cons 'cons? '(first rest)))
                                                       '(one-of atomic-distinct compound self-ref compound self-ref)))
                 '(1 1 1 1 1 1))
   
-  (check-equal? (map score-m (check-dd-rules-internal '(one-of Number "x" "y" "z" Boolean)
+  (check-equal? (map score-m (check-dd-rules-internal (one-of Number "x" "y" "z" Boolean)
                                                       '(one-of atomic-non-distinct
                                                                atomic-distinct
                                                                atomic-distinct
@@ -728,46 +752,46 @@
   
   ;;; ****************
   ;; top-level distinct (shouldn't actually happen, but forms a base case for testing)
-  (check-equal? (map score-m (check-template/types-internal (list "green")
+  (check-equal? (map score-m (check-template/types-internal (list (atomic-d "green"))
                                                             '(define (fn-for-foo x)
                                                                (...))))
                 '(1))
   
   
   ;; simple atomic-non-distinct
-  (check-equal? (map score-m (check-template/types-internal (list 'Number)
+  (check-equal? (map score-m (check-template/types-internal (list Number)
                                                             '(define (fn-for-foo n)
                                                                (... n))))
                 '(1 1))
   
   
   ;; String instead of Number
-  (check-equal? (map score-m (check-template/types-internal (list 'String)
+  (check-equal? (map score-m (check-template/types-internal (list String)
                                                             '(define (fn-for-foo x)
                                                                (... x))))
                 '(1 1))
   
   
   ;; more than one type
-  (check-equal? (map score-m (check-template/types-internal (list 'String 'Number)
+  (check-equal? (map score-m (check-template/types-internal (list String Number)
                                                             '(define (fn-for-foo x y)
                                                                (... x y))))
                 '(1 1 1))
   
   ;; flipped order in body
-  (check-equal? (map score-m (check-template/types-internal (list 'String 'Number)
+  (check-equal? (map score-m (check-template/types-internal (list String Number)
                                                             '(define (fn-for-foo x y)
                                                                (... y x))))
                 '(1 1 1))
   
   ;; missing additional param order in body
-  (check-equal? (map score-m (check-template/types-internal (list 'Number 'String)
+  (check-equal? (map score-m (check-template/types-internal (list Number String)
                                                             '(define (fn-for-foo x y)
                                                                (... x))))
                 '(1 0 1))
   
   ;; missing primary param order in body
-  (check-equal? (map score-m (check-template/types-internal (list 'String 'Number)
+  (check-equal? (map score-m (check-template/types-internal (list String Number)
                                                             '(define (fn-for-foo x y)
                                                                (... y))))
                 '(1 1 0))
@@ -775,7 +799,7 @@
   
   
   ;; wrong parameter
-  (check-equal? (map score-m (check-template/types-internal (list 'String)
+  (check-equal? (map score-m (check-template/types-internal (list String)
                                                             '(define (fn-for-foo x)
                                                                (... y))))
                 '(1 0))
@@ -784,25 +808,25 @@
   
   
   ;; 2 field compound of atomic non-distinct
-  (check-equal? (map score-m (check-template/types-internal (list '(compound (Integer Integer) make-cat cat? (cat-x cat-y)))
+  (check-equal? (map score-m (check-template/types-internal (list Cat)
                                                             '(define (fn-for-foo c)
                                                                (... (cat-x c) (cat-y c)))))
                 '(1 1 1))
   
   ;; first selector is missing, messes up remaining match.
-  (check-equal? (map score-m (check-template/types-internal (list '(compound (Integer Integer) make-cat cat? (cat-x cat-y)))
+  (check-equal? (map score-m (check-template/types-internal (list Cat)
                                                             '(define (fn-for-cat c)
                                                                (... (cat-y c)))))
                 '(1 0 0))
   
   ;; second selector is missing
-  (check-equal? (map score-m (check-template/types-internal (list '(compound (Integer Integer) make-cat cat? (cat-x cat-y)))
+  (check-equal? (map score-m (check-template/types-internal (list Cat)
                                                             '(define (fn-for-cat c)
                                                                (... (cat-x c)))))
                 '(1 1 0))
   
   ;; second selector is garbage
-  (check-equal? (map score-m (check-template/types-internal (list '(compound (Integer Integer) make-cat cat? (cat-x cat-y)))
+  (check-equal? (map score-m (check-template/types-internal (list Cat)
                                                             '(define (fn-for-cat c)
                                                                (... (cat-x c) (foo 1)))))
                 '(1 1 0))
@@ -811,20 +835,20 @@
   
   
   ;; junk at end
-  (check-equal? (map score-m (check-template/types-internal (list '(compound (Integer Integer) make-cat cat? (cat-x cat-y)))
+  (check-equal? (map score-m (check-template/types-internal (list Cat)
                                                             '(define (fn-for-cat c)
                                                                (... (cat-x c) (cat-y c) (foo 1)))))
                 '(1 1 1 0))
   
   
   ;; 1 field is distinct
-  (check-equal? (map score-m (check-template/types-internal (list '(compound (Integer "hello") make-cat cat? (cat-x cat-y)))
+  (check-equal? (map score-m (check-template/types-internal (list (compound (list Integer "hello") 'make-cat 'cat? '(cat-x cat-y)))
                                                             '(define (fn-for-cat c)
                                                                (... (cat-x c) (cat-y c)))))
                 '(1 1 1))
   
   ;; 1 field distinct, val in template
-  (check-equal? (map score-m (check-template/types-internal (list '(compound (Integer "hello") make-cat cat? (cat-x cat-y)))
+  (check-equal? (map score-m (check-template/types-internal (list (compound (list Integer "hello") 'make-cat 'cat? '(cat-x cat-y)))
                                                             '(define (fn-for-cat c)
                                                                (... (cat-x c) "hello"))))
                 '(1 1 1))
@@ -834,33 +858,33 @@
   
   ;; self-ref (note this type isn't well-formed SR since no base case, but it does
   ;; follow the less stringent formedness rules this checker needs
-  (check-equal? (map score-m (check-template/types-internal (list '(compound (Integer (self-ref fn-for-cat))
-                                                                             make-cat cat?
-                                                                             (cat-x cat-foo)))
+  (check-equal? (map score-m (check-template/types-internal (list (compound (list Integer (sref 'Cat 'fn-for-cat))
+                                                                            'make-cat 'cat?
+                                                                            '(cat-x cat-foo)))
                                                             '(define (fn-for-cat c)
                                                                (... (cat-x c) (fn-for-cat (cat-foo c))))))
                 '(1 1 1 1))
   
   
   ;; NR missing
-  (check-equal? (map score-m (check-template/types-internal (list '(compound (Integer (self-ref fn-for-cat))
-                                                                             make-cat cat?
-                                                                             (cat-x cat-foo)))
+  (check-equal? (map score-m (check-template/types-internal (list (compound (list Integer (sref 'Cat 'fn-for-cat))
+                                                                            'make-cat 'cat?
+                                                                            '(cat-x cat-foo)))
                                                             '(define (fn-for-foo c)
                                                                (... (cat-x c) (cat-foo c)))))
                 '(1 1 1 0))
   
   
   ;; ref
-  (check-equal? (map score-m (check-template/types-internal (list '(compound (Integer (ref fn-for-foo))
-                                                                             make-cat cat?
-                                                                             (cat-x cat-foo)))
+  (check-equal? (map score-m (check-template/types-internal (list (compound (list Integer (sref 'Cat 'fn-for-cat))
+                                                                            'make-cat 'cat?
+                                                                            '(cat-x cat-foo)))
                                                             '(define (fn-for-foo c)
                                                                (... (cat-x c) (fn-for-foo (cat-foo c))))))
                 '(1 1 1 1))
   
   
-  (check-equal? (map score-m (check-template/types-internal (list '(one-of String Number))
+  (check-equal? (map score-m (check-template/types-internal (list (one-of String Number))
                                                             '(define (fn-for-foo l)
                                                                (cond [(string? l) (... l)]
                                                                      [else (... l)]))))
@@ -868,13 +892,13 @@
   
   
   ;; number? instead of string? in question
-  (check-equal? (map score-m (check-template/types-internal (list '(one-of String Number))
+  (check-equal? (map score-m (check-template/types-internal (list (one-of String Number))
                                                             '(define (fn-for-foo l)
                                                                (cond [(number? l) (... l)]
                                                                      [else (... l)]))))
                 '(1 0 1 1 1 1 1))
   
-  (check-equal? (map score-m (check-template/types-internal (list '(one-of "a" "b" "c"))
+  (check-equal? (map score-m (check-template/types-internal (list (one-of "a" "b" "c"))
                                                             '(define (fn-for-foo f)
                                                                (cond [(string=? f "a") (...)]
                                                                      [(string=? f "b") (...)]
@@ -883,7 +907,7 @@
 
   
   
-  (check-equal? (map score-m (check-template/types-internal (list '(one-of "pre-launch" Number "post-flight"))
+  (check-equal? (map score-m (check-template/types-internal (list (one-of "pre-launch" Number "post-flight"))
                                                             '(define (fn-for-foo a)
                                                                (cond [(and (string? a) (string=? a "pre-launch")) (...)]
                                                                      [(number? a) (... a)]
@@ -892,14 +916,14 @@
   
   
   ;; number? instead of else
-  (check-equal? (map score-m (check-template/types-internal (list '(one-of String Number))
+  (check-equal? (map score-m (check-template/types-internal (list (one-of String Number))
                                                             '(define (fn-for-foo l)
                                                                (cond [(string? l) (... l)]
                                                                      [(number? l) (... l)]))))
                 '(1 1 1 1 1 1 1))
   
-  ;; LON
-  (check-equal? (map score-m (check-template/types-internal (list LON)
+  ;; ListOfNumber
+  (check-equal? (map score-m (check-template/types-internal (list ListOfNumber)
                                                             '(define (fn-for-lon lon)
                                                                (cond [(empty? lon) (...)]
                                                                      [else
@@ -912,8 +936,8 @@
   
   
   
-  ;; LON no NR
-  (check-equal? (map score-m (check-template/types-internal (list LON)
+  ;; ListOfNumber no NR
+  (check-equal? (map score-m (check-template/types-internal (list ListOfNumber)
                                                             '(define (fn-for-foo lon)
                                                                (cond [(empty? lon) (...)]
                                                                      [else
@@ -922,9 +946,9 @@
                 '(1 1 1 1 1 1 1 0))
   
   
-  (check-equal? (map score-m (check-template/types-internal (list '(one-of empty
-                                                                           (compound ("L" (self-ref fn-for-path)) cons cons? (first rest))
-                                                                           (compound ("R" (self-ref fn-for-path)) cons cons? (first rest))))
+  (check-equal? (map score-m (check-template/types-internal (list (one-of empty
+                                                                          (compound (list "L" (sref 'Path 'fn-for-path)) 'cons 'cons? '(first rest))
+                                                                          (compound (list "R" (sref 'Path 'fn-for-path)) 'cons 'cons? '(first rest))))
                                                             '(define (fn-for-path p)
                                                                (cond [(empty? p) (...)]
                                                                      [(string=? (first p) "L") (... "L" (fn-for-path (rest p)))]
@@ -936,7 +960,7 @@
   
   
   
-  (check-equal? (map score-m (check-template/types-internal (list '(one-of Number "x" "y" "z" Boolean))
+  (check-equal? (map score-m (check-template/types-internal (list (one-of Number "x" "y" "z" Boolean))
                                                             '(define (fn-for-foo f)
                                                                (cond [(number? f)                        (... f)]
                                                                      [(and (string? f) (string=? f "x")) (...)]
@@ -947,7 +971,7 @@
   
   
   ;; goofy order of args to string=? 
-  (check-equal? (map score-m (check-template/types-internal (list '(one-of Number "x" "y" "z" Boolean))
+  (check-equal? (map score-m (check-template/types-internal (list (one-of Number "x" "y" "z" Boolean))
                                                             '(define (fn-for-foo f)
                                                                (cond [(number? f)                        (... f)]
                                                                      [(and (string? f) (string=? "x" f)) (...)]
@@ -959,7 +983,7 @@
   
   
   ;; bad last answer
-  (check-equal? (map score-m (check-template/types-internal (list '(one-of Number "x" "y" "z" Boolean))
+  (check-equal? (map score-m (check-template/types-internal (list (one-of Number "x" "y" "z" Boolean))
                                                             '(define (fn-for-foo f)
                                                                (cond [(number? f)                        (... f)]
                                                                      [(and (string? f) (string=? f "x")) (...)]
@@ -972,7 +996,7 @@
   
   
   ;; bad first and last answers
-  (check-equal? (map score-m (check-template/types-internal (list '(one-of Number "x" "y" "z" Boolean))
+  (check-equal? (map score-m (check-template/types-internal (list (one-of Number "x" "y" "z" Boolean))
                                                             '(define (fn-for-foo f)
                                                                (cond [(number? f)                        (...)]
                                                                      [(and (string? f) (string=? f "x")) (...)]
@@ -985,7 +1009,7 @@
   
   
   ;; missing guard on third question
-  (check-equal? (map score-m (check-template/types-internal (list '(one-of Number "x" "y" "z" Boolean))
+  (check-equal? (map score-m (check-template/types-internal (list (one-of Number "x" "y" "z" Boolean))
                                                             '(define (fn-for-foo f)
                                                                (cond [(number? f)                        (... f)]
                                                                      [(and (string? f) (string=? f "x")) (...)]
@@ -999,7 +1023,7 @@
   
   
   ;; missing guard on third question, missing guard and needless test on fourth question
-  (check-equal? (map score-m (check-template/types-internal (list '(one-of Number "x" "y" "z" Boolean))
+  (check-equal? (map score-m (check-template/types-internal (list (one-of Number "x" "y" "z" Boolean))
                                                             '(define (fn-for-foo f)
                                                                (cond [(number? f)                        (... f)]
                                                                      [(and (string? f) (string=? f "x")) (...)]

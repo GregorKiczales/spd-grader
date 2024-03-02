@@ -480,7 +480,7 @@ validity, and test thoroughness results are reported. No grade information is re
     (assert-context--@htdf)
     (let* ([htdf (car (context))]
            [sigs (htdf-sigs htdf)])
-      (if (< (length sigs) n)
+      (if (not (<= 1 n (length sigs)))
           (score-it 'signature 1 0 #f "Signature: not found.")
           (check-signature (subst 'false #f (list-ref sigs (sub1 n)))
                            (subst 'false #f (cons '@signature sol)))))))
@@ -502,9 +502,13 @@ validity, and test thoroughness results are reported. No grade information is re
   (assert-context--@htdf)
   ;(check-bounds n (length (htdf-names (car (context)))) "function definition")
   (let* ([htdf    (car (context))]
-         [fn-name (if (symbol? n) n (list-ref (htdf-names htdf) (sub1 n)))]
+         [fn-name (cond [(symbol? n) n]
+                        [(not (<= 1 n (length  (htdf-names htdf)))) #f]
+                        [else (list-ref (htdf-names htdf) (sub1 n))])]
          [defns   (htdf-defns htdf)]
-         [defn    (and (pair? defns) (car defns))]
+         [defn    (cond [(symbol? n) (findf (lambda (x) (eqv? (fn-defn-name x) n)) defns)]
+                        [(not (<= 1 n (length  defns))) #f]
+                        [else (list-ref defns (sub1 n))])]
          [body    (and defn (caddr defn))]
          [stub?   (or (not (list? body))
                       (equal? body 'empty)
