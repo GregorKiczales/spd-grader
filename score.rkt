@@ -206,7 +206,7 @@
 
 (define (score-max/min comp . scores)
   (let ([scores (filter score? scores)])
-    (foldl (lambda (s1 s2)
+    (foldr (lambda (s1 s2)
              (cond [(not (= (score-w s1) (score-w s2)))
                     (error "~a (weighted ~a) and ~a (weighted ~a) should have same weight."
                            (score-m s1) (score-w s1)
