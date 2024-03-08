@@ -617,9 +617,9 @@ validity, and test thoroughness results are reported. No grade information is re
                 [nfail  (count (lambda (x) (eqv? x #f)) results)]
                 [nerror (count (lambda (x) (eqv? x 'error)) results)]
                 
-                [%      (/ (max 0 (- npass nerror)) ntests)])
+                [%      (/ (max 0 (- ntests (+ nfail nerror))) ntests)])
            
-           (cond [(= npass ntests)   (score-it topic 1 1 #f "~a tests: correct." Camel)]
+           (cond [(= npass ntests)    (score-it topic 1 1 #f "~a tests: correct." Camel)]
                  
                  [(= nfail  ntests)   (score-it topic 1 0 #f "~a tests: incorrect - every ~a test failed." Camel lower)]
                  [(= nerror ntests)   (score-it topic 1 0 #f "~a tests: incorrect - every ~a test caused an error." Camel lower)]
