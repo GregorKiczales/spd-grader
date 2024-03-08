@@ -26,8 +26,10 @@
                 [local-defns    (and (list? body) (= (length body) 3) (eqv? (car body) 'local) (cadr body))]                     
                 [enough-locals? (and local-defns (>= (length local-defns) (length '(fn-name ...))))]
                 
-                [fn-name        (and enough-locals? (find-defn 'fn-name local-defns))] ...)
-           body-expr ...))]))
+                [fn-name        (and enough-locals? (find-defn 'fn-name local-defns))]
+                ...)
+           (grade-prerequisite 'other "body of function must be filled in with encapsulated type templates" local-defns
+             body-expr ...)))]))
 
 (define-syntax (guard-template-fn-grading stx)
   (syntax-case stx ()
