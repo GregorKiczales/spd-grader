@@ -47,21 +47,27 @@ This solves problems about order of arguments.
 
 
 (define-syntax (grade-design-abstract-fold stx)
-  (syntax-case stx (copy-test count-test @template-origin)
+  (syntax-case stx (@template-origin)
     [(_ fn1 sig (#:copy-test d1 d2) (#:count-test d3 v3 d4 v4) (@template-origin . origins) (define (fn2 . args) . body))
      #'(recovery-point grade-design-abstract-fold
-         (assert-context--@htdf)
          (unless (eqv? 'fn1 'fn2)
-           (error* "fn name and name in function definition are not the same"))
-         (check-design-abstract-fold 'fn1 'args (cdr 'sig) 'd1 'd2 'd3 'd4 'v3 'v4 '(@template-origin . origins) '(define (fn2 . args) . body)))]))
+           (error 'grade-design-abstract-fold "fn name and name in function definition are not the same"))
+         (grade-design-abstract-fold* 'fn1 'args (cdr 'sig) 'd1 'd2 'd3 'd4 'v3 'v4 '(@template-origin . origins) '(define (fn2 . args) . body)))]))
 
-
-(define (check-design-abstract-fold fn args sig d1 d2 d3 d4 v3 v4 totag defn)
-  (let* ([htdf   (car (context))]
+(define (grade-design-abstract-fold* fn args sig d1 d2 d3 d4 v3 v4 totag defn)
+  (let* ([htdf   `(@htdf ,fn)]
          [sigs   (htdf-sigs htdf)]
          [tests  (htdf-checks htdf)]
          [totag2 (and (pair? (htdf-template-origins htdf)) (car (htdf-template-origins htdf)))]
          [defn2  (and (htdf-defns htdf) (last (htdf-defns htdf)))])
+    (check-design-abstract-fold     fn args sig d1 d2 d3 d4 v3 v4 totag defn sigs tests totag2 defn2)))
+  
+(define (check-design-abstract-fold fn args sig d1 d2 d3 d4 v3 v4 totag defn sigs tests totag2 defn2)
+;  (let* ([htdf   (car (context))]
+;         [sigs   (htdf-sigs htdf)]
+;         [tests  (htdf-checks htdf)]
+;         [totag2 (and (pair? (htdf-template-origins htdf)) (car (htdf-template-origins htdf)))]
+;         [defn2  (and (htdf-defns htdf) (last (htdf-defns htdf)))])
     (weights (.50 *)
         
       (if (not (pair? sigs))
@@ -94,7 +100,7 @@ This solves problems about order of arguments.
                                          (calling-evaluator #f `(equal? ,lhs ,v3))
                                          (calling-evaluator #f `(equal? ,(subst d4 d3 lhs) ,v4)))))
                                 tests))
-                       "Count test")))))
+                       "Count test")))) ;)
 
 ;; !!! this subst uses equal? not eqv? consider changing the one in utils and testing
 (define (subst new old in)
