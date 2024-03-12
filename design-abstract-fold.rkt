@@ -55,7 +55,7 @@ This solves problems about order of arguments.
          (grade-design-abstract-fold* 'fn1 'args (cdr 'sig) 'd1 'd2 'd3 'd4 'v3 'v4 '(@template-origin . origins) '(define (fn2 . args) . body)))]))
 
 (define (grade-design-abstract-fold* fn args sig d1 d2 d3 d4 v3 v4 totag defn)
-  (let* ([htdf   `(@htdf ,fn)]
+  (let* ([htdf   (get-htdf* fn)]
          [sigs   (htdf-sigs htdf)]
          [tests  (htdf-checks htdf)]
          [totag2 (and (pair? (htdf-template-origins htdf)) (car (htdf-template-origins htdf)))]
@@ -63,44 +63,39 @@ This solves problems about order of arguments.
     (check-design-abstract-fold     fn args sig d1 d2 d3 d4 v3 v4 totag defn sigs tests totag2 defn2)))
   
 (define (check-design-abstract-fold fn args sig d1 d2 d3 d4 v3 v4 totag defn sigs tests totag2 defn2)
-;  (let* ([htdf   (car (context))]
-;         [sigs   (htdf-sigs htdf)]
-;         [tests  (htdf-checks htdf)]
-;         [totag2 (and (pair? (htdf-template-origins htdf)) (car (htdf-template-origins htdf)))]
-;         [defn2  (and (htdf-defns htdf) (last (htdf-defns htdf)))])
-    (weights (.50 *)
-        
-      (if (not (pair? sigs))
-          (rubric-item 'signature #f "Abstract function signature")
-          (check-signature-by-constraints (and sigs (car sigs))
-                                          (make-constraints-from-signature sig)))
-      
-      ;; grade-prerequisite without excess indenting
-      (if (not (equal? defn defn2))
-          (score-it 'submitted-tests 1 0 #f "Copy test: incorrect (fold function has been edited).")
-          (rubric-item 'submitted-tests
-                       (with-handlers ([void (lambda (e) #f)])
-                         (ormap (lambda (ce)
-                                  (let ([lhs (cadr ce)]
-                                        [rhs (caddr ce)])
-                                    (and (calling-evaluator #f `(equal? ,rhs ,d1))
-                                         (calling-evaluator #f `(equal? ,lhs ,d1))
-                                         (calling-evaluator #f `(equal? ,(subst d2 d1 lhs) ,d2)))))
-                                tests))
-                       "Copy test"))
+  (weights (.50 *)
+    
+    (if (not (pair? sigs))
+        (rubric-item 'signature #f "Abstract function signature")
+        (check-signature-by-constraints (and sigs (car sigs))
+                                        (make-constraints-from-signature sig)))
+    
+    ;; grade-prerequisite without excess indenting
+    (if (not (equal? defn defn2))
+        (score-it 'submitted-tests 1 0 #f "Copy test: incorrect (fold function has been edited).")
+        (rubric-item 'submitted-tests
+                     (with-handlers ([void (lambda (e) #f)])
+                       (ormap (lambda (ce)
+                                (let ([lhs (cadr ce)]
+                                      [rhs (caddr ce)])
+                                  (and (calling-evaluator #f `(equal? ,rhs ,d1))
+                                       (calling-evaluator #f `(equal? ,lhs ,d1))
+                                       (calling-evaluator #f `(equal? ,(subst d2 d1 lhs) ,d2)))))
+                              tests))
+                     "Copy test"))
 
-      (if (not (equal? defn defn2))
-          (score-it 'submitted-tests 1 0 #f "Count test: incorrect (fold function has been edited).")
-          (rubric-item 'submitted-tests                
-                       (with-handlers ([void (lambda (e) #f)])
-                         (ormap (lambda (ce)
-                                  (let ([lhs (cadr ce)]
-                                        [rhs (caddr ce)])
-                                    (and (calling-evaluator #f `(equal? ,rhs ,v3))
-                                         (calling-evaluator #f `(equal? ,lhs ,v3))
-                                         (calling-evaluator #f `(equal? ,(subst d4 d3 lhs) ,v4)))))
-                                tests))
-                       "Count test")))) ;)
+    (if (not (equal? defn defn2))
+        (score-it 'submitted-tests 1 0 #f "Count test: incorrect (fold function has been edited).")
+        (rubric-item 'submitted-tests                
+                     (with-handlers ([void (lambda (e) #f)])
+                       (ormap (lambda (ce)
+                                (let ([lhs (cadr ce)]
+                                      [rhs (caddr ce)])
+                                  (and (calling-evaluator #f `(equal? ,rhs ,v3))
+                                       (calling-evaluator #f `(equal? ,lhs ,v3))
+                                       (calling-evaluator #f `(equal? ,(subst d4 d3 lhs) ,v4)))))
+                              tests))
+                     "Count test"))))
 
 ;; !!! this subst uses equal? not eqv? consider changing the one in utils and testing
 (define (subst new old in)
