@@ -821,6 +821,7 @@ validity, and test thoroughness results are reported. No grade information is re
 
 ;(define-syntax (grade-exact-problem-body stx)) ;deprecated, see pset-01-grader.rkt
 
+;; !!! rename to grade-encapsulation (or delete)
 (define-syntax (grade-refactoring stx)
   (syntax-case stx ()
     [(_ n

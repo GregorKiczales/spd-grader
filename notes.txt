@@ -21,24 +21,54 @@ grade-dd-rules
 grade-dd-template
 
 
-
-
 Macros that establish what function(s) are being graded
 
 what is bound? fn-name, fn-definition, compound of both?
 
-grade-htdf  foo  $foo  (foo ...) ($foo ...)
-grade-helper
-grade-bb-helper
-grade-encapsulated-template-fns
+we can't say that defn is easy to get if we have name because sometimes we are inside encapsulated,
+unless grade-encapsulated binds (current-defns) for us, hmmm
 
 
-grade-signature          (...)
-grade-signature       fn (...)
+(grade-htdf foo       ;(@htdf foo ...) foo is 'foo; (current-defns) is (list '(define (foo )) ...)
+(grade-htdf $foo      ;(@htdf any ...) foo is 'any; ...
+(grade-htdf (foo bar) ;(@htdf foo bar) foo is 'foo, bar is 'bar; ...
+(grade-htdf (*   bar) ;(@htdf *   bar) bar is 'bar; ...
+
+grade-helper                    sort helper; helper is 'insert
+grade-bb-helper                 on-mouse handler; handler is 'on-mouse
+grade-encapsulated-template-fns (foo bar ...); foo is 'foo, bar is 'bar...
+
+Inside ALL the above, (get-htdf) (get-defns) (get-defn 'foo) all work
+!!! get-defns and get-defn already exist with slightly different behaviour
+
+(context)
+(current-htdd)
+(current-htdf)b
+
+
+(rename get-htdf* to find-htdf, to match helper names for grade-helper and grade-bb-helper)
+
+
+what if there was:
+
+(struct htdd (tag structs type-comment examples origin template)) 
+(struct htdf (tag sig purpose checks origin template defn))
+
+in real terms, is that any different than just having
+
+(find-sig/purpose...)
+
+
+
+
+Below all (should) take an optional first argument that is whatever the above bound the parameter to.
+
+
+grade-signature
 grade-signature-by-constraints 
 
-grade-template-origin    (...)
-grade-template-origin fn (...)
+grade-template-origin
+grade-template-origin
 
 grade-validity
 grade-argument-thoroughness
