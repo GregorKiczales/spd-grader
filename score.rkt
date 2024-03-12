@@ -65,7 +65,7 @@
       (score #f topic 1 1 '() (list (message #f "~a: correct."   (apply format fmt-ctl fmt-args))))
       (score #f topic 1 0 '() (list (message #f "~a: incorrect." (apply format fmt-ctl fmt-args))))))
 
-(define (reduce-it topic w correct? fmt-ctl . fmt-args)
+(define (reduce-it topic w correct? fmt-ctl . fmt-args)  
   (if correct?
       (reduction topic w correct? (message #f "Reduction not applied: ~a." (apply format fmt-ctl fmt-args)))    ;display-score hides these
       (reduction topic w correct? (message #f "Reduction: ~a."             (apply format fmt-ctl fmt-args)))))
@@ -80,7 +80,7 @@
      #'(let* ([max-score (+ V ...)]
               [items (list (list V (lambda () Q) T) ...)]
               [applied (filter (lambda (i) (not ((cadr i)))) items)])
-         (if (empty? applied)
+         (if (null? applied)
              (score-it 'TOPIC 1 1 #f "~a: ~a." PREFIX Te)
              (score #f
                     'TOPIC
@@ -111,20 +111,20 @@
            #,@(map cadr es)))]))
 
 (define (weights* left low los)
-  (let loop ([left left] [low low] [los (filter score? los)]) ;ensure produces (void)
-    (cond [(and (empty? low) (empty? los)) '()]
-          [(empty? low) (error 'weights/weights* "More scores than weights and weights does not end with *.")]
-          [(empty? los) (error 'weights/weights* "More weights than scores.")]
+  (let loop ([left left] [low low] [los (filter (lambda (x) (or (score? x) (reduction? x))) los)])
+    (cond [(and (not (null? los))
+                (reduction? (car los)))
+           (cons (car los)
+                 (loop left low (cdr los)))]
+          [(and (null? low) (null? los)) '()]
+          [(null? low) (error 'weights/weights* "More scores than weights and weights does not end with *.")]
+          [(null? los) (error 'weights/weights* "More weights than scores.")]
           [(eqv? (car low) '*) (map (curry weight (/ left (length los))) los)]
           [else
-           (cond [(score? (car los))
-                  (cons (weight (car low) (car los))
-                        (loop (- left (car low))
-                              (cdr low)
-                              (cdr los)))]
-                 [(reduction? (car los))
-                  (cons (car los)
-                        (loop left low (cdr los)))])])))
+           (cons (weight (car low) (car los))
+                 (loop (- left (car low))
+                       (cdr low)
+                       (cdr los)))])))
 
 (define (weight n item)
   (struct-copy %score item [w n]))
@@ -260,13 +260,13 @@
                     (list new-%total new-%total '())]))]))
 
   (define (walk/los los %total indent)
-    (cond [(empty? los) '()]
+    (cond [(null? los) '()]
           [else
            (cons (walk/s (car los) %total indent)
                  (walk/los (cdr los) %total indent))]))
 
   (define (walk/lomsg lomsg header? %mark %total old-indent new-indent first?)
-    (cond [(empty? lomsg) '()]
+    (cond [(null? lomsg) '()]
           [else
            (walk/msg (first lomsg) header? %mark %total old-indent new-indent first? #t)
            (walk/lomsg (cdr lomsg) header? %mark %total old-indent new-indent #f)]))
