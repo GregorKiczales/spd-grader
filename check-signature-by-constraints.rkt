@@ -11,7 +11,9 @@
          
          check-signature-by-constraints
          make-constraints-from-signature
-         
+
+         ;; !!! does anyone outside here use this?
+         ;; !!! maybe move grade-signature to this file, rename to signature
          constraint
          fn-sig
          select
@@ -33,16 +35,21 @@
                fns)))
 
 
+;; !!! rename this to grade-signature/tvars
 (define-syntax (grade-signature-by-constraints stx)
   (syntax-case stx ()
-    [(_ n sig)
+    [(_ n sol)
      #'(recovery-point grade-signature-by-constraints
          (assert-context--@htdf)
 	 (let* ([htdf (car (context))]
-		[sigs (htdf-sigs htdf)])
-	   (check-bounds n (length sigs) "@signature tag")
-           (check-signature-by-constraints (list-ref sigs (sub1 n))
-                                           (make-constraints-from-signature 'sig))))]))
+		[sigs (htdf-sigs htdf)]
+                [sig  (and (pair? sigs)
+                           (>= (length sigs) n)
+                           (list-ref sigs (sub1 n)))])
+           ;(check-bounds n (length sigs) "@signature tag")
+           (grade-prerequisite 'signature (format "Cannot find the ~a signature." (number->ordinal n)) sig
+             (check-signature-by-constraints sig
+                                             (make-constraints-from-signature 'sol)))))]))
 
 (define (check-signature-by-constraints sig constraints)
   (header "Abstract function signature:"
