@@ -123,62 +123,63 @@ NOTE: This problem will be autograded, and ALL OF THE FOLLOWING ARE ESSENTIAL
 
 (define (check-use-bia-fn fn-name sig max-marks-and-comps supplied additional)
   (assert-context--@htdf)
-  (let* ([sexps (map elt-sexp (elts))]
-         [htdf (car (context))]
-         [defns (htdf-defns htdf)]
-         [defn  (car defns)]
-         [to-tags (htdf-template-origins htdf)]
-         [to-tag  (and (pair? to-tags) (car to-tags))]
-         [all-bia-fns (remove-duplicates   ;allow graders to specify abs-fns we don't know like map2
-                       (append (apply append (map all-fns (map cadr max-marks-and-comps))) 
-                               BIA-FNS))]
-         ;; specially allow and/or to be used in the grade-use-bia-fn composition/combinations
-         [called-bia-fns (special-calls (caddr defn) all-bia-fns)])
+  (ensuring 
+   (let* ([sexps (map elt-sexp (elts))]
+          [htdf (car (context))]
+          [defns (htdf-defns htdf)]
+          [defn  (car defns)]
+          [to-tags (htdf-template-origins htdf)]
+          [to-tag  (and (pair? to-tags) (car to-tags))]
+          [all-bia-fns (remove-duplicates   ;allow graders to specify abs-fns we don't know like map2
+                        (append (apply append (map all-fns (map cadr max-marks-and-comps))) 
+                                BIA-FNS))]
+          ;; specially allow and/or to be used in the grade-use-bia-fn composition/combinations
+          [called-bia-fns (special-calls (caddr defn) all-bia-fns)]
+          [comp (and defn (infer-bia-fn-composition (datum->syntax #f defn) all-bia-fns))])
 
-    (ensure (pair? (caddr defn))          "fn definition must be more than stub")
-    (ensure (= (length defns) 1)          "must define single top-level function")
-    (ensure (not (recursive? defn))       "must not be recursive")
-    (ensure (not (empty? called-bia-fns)) "must call one or more built-in abstract functions")
+     (ensure (= (length defns) 1)          "(@htdf ~a) must define single top-level function" fn-name)
+     (ensure (pair? (caddr defn))          "~a function definition must be more than stub" fn-name)
+     (ensure (not (recursive? defn))       "~a function definition must not be recursive" fn-name)
+     (ensure (not (empty? called-bia-fns)) "~a function definition must call one or more built-in abstract functions" fn-name)
+     (ensure (not (equal? comp 'any)) "~a function definition must produce result of a built-in abstract functions" fn-name)
 
+     (let* ([entry                     (lookup comp max-marks-and-comps)]
+            [entry-is-best?            (and entry (equal? entry (first max-marks-and-comps)))]
+            [ti-score                  (if entry (car entry) 0)]
+            [ti-score-reduction-string (and entry (~r (* 100 (- 1 (car entry))) #:precision 1 #:notation 'positional))]
+            [data-arg                  (if (eqv? (caadar max-marks-and-comps) 'build-list)
+                                           (cadr  (cadar max-marks-and-comps))
+                                           (caddr (cadar max-marks-and-comps)))]
+            [best-is-comp?             (not (eq? data-arg '_))]
+            [to-score
+             (cond [(not (pair? to-tag)) 0]
+                   ;; for now ignore fn-composition 
+                   #;
+                   [best-is-comp?
+                    (+ (if (member 'fn-composition  to-tag) .5 0)
+                       (if (member 'use-abstract-fn to-tag) .5 0))]
+                   [else
+                    (if (member 'use-abstract-fn to-tag) 1 0)])])
 
-    (let* ([comp (infer-bia-fn-composition (datum->syntax #f defn) all-bia-fns)]
-           [entry                     (lookup comp max-marks-and-comps)]
-           [entry-is-best?            (and entry (equal? entry (first max-marks-and-comps)))]
-           [ti-score                  (if entry (car entry) 0)]
-           [ti-score-reduction-string (and entry (~r (* 100 (- 1 (car entry))) #:precision 1 #:notation 'positional))]
-           [data-arg                  (if (eqv? (caadar max-marks-and-comps) 'build-list)
-                                          (cadr  (cadar max-marks-and-comps))
-                                          (caddr (cadar max-marks-and-comps)))]
-           [best-is-comp?             (not (eq? data-arg '_))]
-           [to-score
-            (cond [(not (pair? to-tag)) 0]
-                  ;; for now ignore fn-composition 
-                  #;
-                  [best-is-comp?
-                   (+ (if (member 'fn-composition  to-tag) .5 0)
-                      (if (member 'use-abstract-fn to-tag) .5 0))]
-                  [else
-                   (if (member 'use-abstract-fn to-tag) 1 0)])])
+       (header (format "Use built-in abstract function -")
+         (weights (.05 .40 .55)
 
-      (header (format "Use built-in abstract function -")
-        (weights (.05 .40 .55)
+           (reduce-it 'other 10/100 (unchanged? (list sig) sexps) "must not edit signature in starter file")
+           (reduce-it 'other 10/100 (unchanged? supplied sexps)   "must not edit tests in starter file")
 
-          (reduce-it 'other 10/100 (unchanged? (list sig) sexps) "must not edit signature in starter file")
-          (reduce-it 'other 10/100 (unchanged? supplied sexps)   "must not edit tests in starter file")
-
-          (score-it 'template-origin 1 to-score #f
-                    (format "@template-origin tag: ~a."
-                            (cond [(= to-score 0) "incorrect"]
-                                  [(= to-score 1)   "correct"]
-                                  [else "partially correct"])))
-          (score-it 'template-intact 1 ti-score #f
-                    (format "choice of abstract function~a: ~a"
-                            (if best-is-comp? "s" "")
-                            (cond [(= ti-score 0) "incorrect"]
-                                  [(= ti-score 1)   "correct"]
-                                  [else "partially correct"])))
-          
-          (check-additional-tests fn-name additional))))))
+           (score-it 'template-origin 1 to-score #f
+                     (format "@template-origin tag: ~a."
+                             (cond [(= to-score 0) "incorrect"]
+                                   [(= to-score 1)   "correct"]
+                                   [else "partially correct"])))
+           (score-it 'template-intact 1 ti-score #f
+                     (format "choice of abstract function~a: ~a"
+                             (if best-is-comp? "s" "")
+                             (cond [(= ti-score 0) "incorrect"]
+                                   [(= ti-score 1)   "correct"]
+                                   [else "partially correct"])))
+           
+           (check-additional-tests fn-name additional)))))))
 
 
 (define (special-calls f0 all-bia-fns)

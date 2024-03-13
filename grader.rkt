@@ -117,7 +117,17 @@
          ((evaluator) exp))]))
 
 
-
+;; !!! all the binding things should do this???
+;; !!! and it probably doesn't need to use exceptions
+(define-syntax (ensuring stx)
+  (syntax-case stx ()
+    [(_ item)
+     #'(with-handlers ([exn:fail:ensure-violation?
+                        (lambda (e)
+                          (weights (*)
+                            (rubric-item 'other #f (exn-message e))))])
+         item)]))
+         
 
 (define (ensure tst fmt-ctl . fmt-args)
   (when (not tst)
@@ -500,7 +510,6 @@ validity, and test thoroughness results are reported. No grade information is re
 
 (define (grade-submitted-tests* n min)
   (assert-context--@htdf)
-  ;(check-bounds n (length (htdf-names (car (context)))) "function definition")
   (let* ([htdf    (car (context))]
          [fn-name (cond [(symbol? n) n]
                         [(not (<= 1 n (length  (htdf-names htdf)))) #f]
@@ -850,9 +859,12 @@ validity, and test thoroughness results are reported. No grade information is re
      #'(recovery-point grade-constants-use
          (assert-context--@htdf)
          (let* ([htdf (car (context))]
-                [defns (htdf-defns htdf)])
-           (check-bounds n (length defns) "function definition")
-           (check-constants-use (list-ref defns (sub1 n)) 'constants (list-ref htdf n) false)))]))
+                [defns (htdf-defns htdf)]
+                [defn  (and (pair? defns)
+                            (>= (length defns) n)
+                            (list-ref defns (sub1 n)))])
+           (grade-prerequisite 'other (format "Cannot find the ~a function definition" (number->ordinal n)) defn
+             (check-constants-use defn 'constants (list-ref htdf n) false))))]))
 
 (define-syntax (grade-tests-constants-use stx)
   (syntax-case stx ()
@@ -1266,9 +1278,6 @@ validity, and test thoroughness results are reported. No grade information is re
 	      (guard (context)))
     (error 'assert-context "Must be ~a, instead context is ~a." str (context))))
 
-;; !!! moves or goes away
-(define (check-bounds n max kind)
-  (unless (valid-index (sub1 n) max) (raise-student-error "could not find the ~a ~a" (number->ordinal n) kind)))
 
 
 

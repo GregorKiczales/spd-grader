@@ -46,7 +46,6 @@
                 [sig  (and (pair? sigs)
                            (>= (length sigs) n)
                            (list-ref sigs (sub1 n)))])
-           ;(check-bounds n (length sigs) "@signature tag")
            (grade-prerequisite 'signature (format "Cannot find the ~a signature." (number->ordinal n)) sig
              (check-signature-by-constraints sig
                                              (make-constraints-from-signature 'sol)))))]))
