@@ -179,7 +179,7 @@ NOTE: This problem will be autograded, and ALL OF THE FOLLOWING ARE ESSENTIAL
                                    [(= ti-score 1)   "correct"]
                                    [else "partially correct"])))
            
-           (check-additional-tests fn-name additional)))))))
+           (check-additional-tests fn-name additional 0)))))))
 
 
 (define (special-calls f0 all-bia-fns)
