@@ -508,6 +508,12 @@ validity, and test thoroughness results are reported. No grade information is re
     [(_   min) #'(grade-submitted-tests*  1 `min)]
     [(_ n min) #'(grade-submitted-tests* `n `min)]))
 
+(define-syntax (grade-additional-tests stx)
+  (syntax-case stx ()
+    [(_ n test ...)
+     #'(grade-additional-tests* `n 2 `(test ...))]))
+
+
 (define (grade-submitted-tests* n min)
   (assert-context--@htdf)
   (let* ([htdf    (car (context))]
@@ -524,15 +530,9 @@ validity, and test thoroughness results are reported. No grade information is re
                       (equal? body '()))]
          [tests (get-function-tests fn-name)])
     (grade-prerequisite 'submitted-tests "submitted-tests: function definition must be more than a stub" (not stub?)
-      (check-submitted-tests fn-name tests))))
-                                   
+      (check-submitted-tests fn-name tests min))))
 
-(define-syntax (grade-additional-tests stx)
-  (syntax-case stx ()
-    [(_ n test ...)
-     #'(grade-additional-tests* `n `(test ...))]))
-
-(define (grade-additional-tests* n tests)
+(define (grade-additional-tests* n min tests)
   (let* ([htdf    (car (context))]
          [fn-name (if (symbol? n) n (list-ref (htdf-names htdf) (sub1 n)))]
          [defns   (htdf-defns htdf)]
@@ -542,7 +542,7 @@ validity, and test thoroughness results are reported. No grade information is re
                       (equal? body 'empty)
                       (equal? body '()))])
     (grade-prerequisite 'additional-tests "additional-tests: function definition must be more than a stub" (not stub?)
-      (check-additional-tests fn-name tests))))
+      (check-additional-tests fn-name tests min))))
 
 
 (define-syntax (grade-tests-validity stx)
@@ -604,11 +604,11 @@ validity, and test thoroughness results are reported. No grade information is re
     (check-faulty-functions fn-name tests defns)))
 
 
-(define (check-submitted-tests  fn-name tests) (check-tests fn-name tests 'submitted-tests  "Submitted"  "submitted"))
-(define (check-additional-tests fn-name tests) (check-tests fn-name tests 'additional-tests "Additional" "autograder supplied additional"))
+(define (check-submitted-tests  fn-name tests min) (check-tests fn-name tests min 'submitted-tests  "Submitted"  "submitted"))
+(define (check-additional-tests fn-name tests min) (check-tests fn-name tests min 'additional-tests "Additional" "autograder supplied additional"))
 
-(define (check-tests fn-name tests topic Camel lower)
-  (cond [(< (length tests) 2) (score-it topic 1 0 #f "~a tests: incorrect - at least 2 tests are required." Camel)]
+(define (check-tests fn-name tests min topic Camel lower)
+  (cond [(< (length tests) min) (score-it topic 1 0 #f "~a tests: incorrect - at least ~a are required." Camel (pluralize min "test"))]
         [else
          (let* ([names (map (lambda (x) (gensym)) tests)]
                 [results
@@ -626,9 +626,10 @@ validity, and test thoroughness results are reported. No grade information is re
                 [nfail  (count (lambda (x) (eqv? x #f)) results)]
                 [nerror (count (lambda (x) (eqv? x 'error)) results)]
                 
-                [%      (/ (max 0 (- ntests (+ nfail nerror))) ntests)])
+                [%      (if (zero? ntests) 0 (/ (max 0 (- ntests (+ nfail nerror))) ntests))])
            
-           (cond [(= npass ntests)    (score-it topic 1 1 #f "~a tests: correct." Camel)]
+           (cond [(zero? ntests)      (score-it topic 1 0 #f "~a tests: no tests submitted." Camel)] ;can't happen for additional, unlikely for submitted
+                 [(= npass ntests)    (score-it topic 1 1 #f "~a tests: correct." Camel)]
                  
                  [(= nfail  ntests)   (score-it topic 1 0 #f "~a tests: incorrect - every ~a test failed." Camel lower)]
                  [(= nerror ntests)   (score-it topic 1 0 #f "~a tests: incorrect - every ~a test caused an error." Camel lower)]
