@@ -418,6 +418,16 @@
                  [(define local-define) (cons (syntax->datum stx) (recur))] ;!!! all these functions should produce syntax
                  [(if cond and or #;define local #;local-define local-body lambda call) (recur)]))))
 
+(define (internal-fns  f0)
+  (walk-form (datum->syntax #f f0)
+             '()
+             (lambda (kind stx e ctx env in-fn recur)
+               (walker-case kind
+                 [(value constant null bound free) '()]
+                 [(local-define lambda) (cons (syntax->datum stx) (recur))] ;!!! all these functions should produce syntax
+                 [(if cond and or define local #;local-define local-body #;lambda call) (recur)]))))
+
+
 (define (cond/empty?/zero? defn params-to-check)
   (let ([fn-name (car  (cadr defn))])
     

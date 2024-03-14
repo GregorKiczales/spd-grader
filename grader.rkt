@@ -118,7 +118,7 @@
 
 
 ;; !!! all the binding things should do this???
-;; !!! and it probably doesn't need to use exceptions
+;; !!! otherwise ensure violations blow out the entire file
 (define-syntax (ensuring stx)
   (syntax-case stx ()
     [(_ item)
