@@ -55,24 +55,28 @@ This solves problems about order of arguments.
          (grade-design-abstract-fold* 'fn1 'args (cdr 'sig) 'd1 'd2 'd3 'd4 'v3 'v4 '(@template-origin . origins) '(define (fn2 . args) . body)))]))
 
 (define (grade-design-abstract-fold* fn args sig d1 d2 d3 d4 v3 v4 totag defn)
-  (let* ([htdf   (get-htdf* fn)]
-         [sigs   (htdf-sigs htdf)]
-         [tests  (htdf-checks htdf)]
-         [totag2 (and (pair? (htdf-template-origins htdf)) (car (htdf-template-origins htdf)))]
-         [defn2  (and (htdf-defns htdf) (last (htdf-defns htdf)))])
-    (check-design-abstract-fold     fn args sig d1 d2 d3 d4 v3 v4 totag defn sigs tests totag2 defn2)))
+  (assert-context--@problem)
+  (parameterize ([context (cons (get-htdf* fn) (context))])
+    (let* ([htdf   (car (context))]
+           [sigs   (htdf-sigs htdf)]
+           [tests  (htdf-checks htdf)]
+           [totag2 (and (pair? (htdf-template-origins htdf)) (car (htdf-template-origins htdf)))]
+           [defn2  (and (htdf-defns htdf) (last (htdf-defns htdf)))])
+      (check-design-abstract-fold     fn args sig d1 d2 d3 d4 v3 v4 totag defn sigs tests totag2 defn2))))
   
 (define (check-design-abstract-fold fn args sig d1 d2 d3 d4 v3 v4 totag defn sigs tests totag2 defn2)
-  (weights (.50 *)
+  (weights (.50 0 *)
     
     (if (not (pair? sigs))
         (rubric-item 'signature #f "Abstract function signature")
         (check-signature-by-constraints (and sigs (car sigs))
                                         (make-constraints-from-signature sig)))
+
+    (grade-submitted-tests* 1 0)
     
     ;; grade-prerequisite without excess indenting
     (if (not (equal? defn defn2))
-        (score-it 'submitted-tests 1 0 #f "Copy test: incorrect (fold function has been edited).")
+        (rubric-item 'submitted-tests #f "Prerequisite for copy test - ~a must not be edited" fn)
         (rubric-item 'submitted-tests
                      (with-handlers ([void (lambda (e) #f)])
                        (ormap (lambda (ce)
@@ -85,7 +89,7 @@ This solves problems about order of arguments.
                      "Copy test"))
 
     (if (not (equal? defn defn2))
-        (score-it 'submitted-tests 1 0 #f "Count test: incorrect (fold function has been edited).")
+        (rubric-item 'submitted-tests #f "Prerequisite for count test - ~a must not be edited" fn)
         (rubric-item 'submitted-tests                
                      (with-handlers ([void (lambda (e) #f)])
                        (ormap (lambda (ce)
