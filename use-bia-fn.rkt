@@ -141,7 +141,7 @@ NOTE: This problem will be autograded, and ALL OF THE FOLLOWING ARE ESSENTIAL
      (ensure (pair? (caddr defn))          "~a function definition must be more than stub" fn-name)
      (ensure (not (recursive? defn))       "~a function definition must not be recursive" fn-name)
      (ensure (not (empty? called-bia-fns)) "~a function definition must call one or more built-in abstract functions" fn-name)
-     (ensure (not (equal? comp 'any)) "~a function definition must produce result of a built-in abstract functions" fn-name)
+     (ensure (not (equal? comp 'any))      "~a function definition must produce result of a built-in abstract functions" fn-name) ;above should prevent this
 
      (let* ([entry                     (lookup comp max-marks-and-comps)]
             [entry-is-best?            (and entry (equal? entry (first max-marks-and-comps)))]
@@ -324,7 +324,9 @@ NOTE: This problem will be autograded, and ALL OF THE FOLLOWING ARE ESSENTIAL
 
   (with-handlers ([exn:fail?
                    (lambda (e) '())])
-    (car (walk-form stx0 '() p append))))
+    (if (recursive? (syntax->datum stx0))
+        'any
+        (car (walk-form stx0 '() p append)))))
 
 (define (compose-abs-fn-result biafn arg-types)
   (case biafn
@@ -514,11 +516,10 @@ NOTE: This problem will be autograded, and ALL OF THE FOLLOWING ARE ESSENTIAL
                                                 (build-list (string-length s) grow))))
                 '(build-list any (build-list any any)))
 
-  (check-equal? (infer-bia-fn-composition #'(define(funny lon str)
-                                              (local [(define (lon->los lon)
-                                                        (foldr (lambda (n str) (xxx (number->string n) n) ) lon))]
-                                                (lon->los lon))))
-                '(build-list any (build-list any any)))
-
-
-  ) ;!!!
+  (check-equal? (infer-bia-fn-composition #'(define (get-songs-longer-than-n los n)
+                                              (cond [(empty? los) empty]
+                                                    [else
+                                                     (if (> (song-length (first los)) n)
+                                                         (cons (first los) (get-songs-longer-than-n (rest los) n))
+                                                         (get-songs-longer-than-n (rest los) n))])))
+                'any))
