@@ -23,24 +23,25 @@
     (check-2-one-of htdf defn params sol-pairs)))
 
 (define (check-2-one-of htdf defn sol-params sol-pairs)
-  (ensuring
-   (begin
-     (ensure defn                             "(@htdf ~a) must define single top-level function" (cadr htdf))
-     (ensure (pair? (caddr defn))             "~a function definition must be more than stub" (cadr htdf))
-     (ensure (eqv?  (car (caddr defn)) 'cond) "~a function definition body must be a cond expression" (cadr htdf))
+  (header "2-one-of:"
+    (ensuring
+     (begin
+       (ensure defn                             "(@htdf ~a) must define single top-level function" (cadr htdf))
+       (ensure (pair? (caddr defn))             "~a function definition must be more than stub" (cadr htdf))
+       (ensure (eqv?  (car (caddr defn)) 'cond) "~a function definition body must be a cond expression" (cadr htdf))
 
-     (let* ([cnd         (get-cond defn)]
-            [sub-params  (fn-defn-parameters defn)]
-            [sub-pairs   (cdr cnd)]
-            [sub-qs      (map car sub-pairs)]
-            [sub-sub-qs  (get-sub-qs sub-qs)]
+       (let* ([cnd         (get-cond defn)]
+              [sub-params  (fn-defn-parameters defn)]
+              [sub-pairs   (cdr cnd)]
+              [sub-qs      (map car sub-pairs)]
+              [sub-sub-qs  (get-sub-qs sub-qs)]
 
-            [sol-qs      (rename-params sub-params sol-params (map car sol-pairs) (fn-defn-name defn))]
-            [sol-sub-qs  (get-sub-qs sol-qs)]
+              [sol-qs      (rename-params sub-params sol-params (map car sol-pairs) (fn-defn-name defn))]
+              [sol-sub-qs  (get-sub-qs sol-qs)]
 
-            [invalid-sub-qs (filter (lambda (pq) (not (memf (lambda (opq) (qequal? pq opq)) sol-sub-qs))) sub-sub-qs)])
+              [invalid-sub-qs (filter (lambda (pq) (not (memf (lambda (opq) (qequal? pq opq)) sol-sub-qs))) sub-sub-qs)])
 
-       (header "2-one-of:"
+
          (weights (.1 .4 .2 *)
            (grade-template-origin (2-one-of))
            (rubric-item 'template-intact
