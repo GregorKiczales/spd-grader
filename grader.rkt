@@ -1225,10 +1225,9 @@ validity, and test thoroughness results are reported. No grade information is re
       (combine-scores
        (weights* 1.0
                  '(*)
-                 (append (for/list ([req required])
-                           (if (member req sub)             
-                               (score-it 'template-origin 1 1 #f "~a: correct." req)
-                               (score-it 'template-origin 1 0 #f "~a: incorrect (missing)." req)))
+                 (append (for/list ([n (in-naturals 1)]
+                                    [req required])
+                           (rubric-item 'template-origin (member req sub) "~a is present" req))
                          (for/list ([pna present-not-allowed])
                            (score-it 'template-origin 1 0 #f "~a: incorrect (not allowed)." pna))))))))
 
