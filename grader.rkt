@@ -117,6 +117,16 @@
          ((evaluator) exp))]))
 
 
+(define-syntax (with-errors->0 stx)
+  (syntax-case stx ()
+    [(_ what exp ...)
+     #'(with-handlers ([exn?
+                        (lambda (e)
+                          (weights (*)
+                            (score-it 'other 1 0 #f  "Error grading ~a: ~a" what (exn-message e))))])
+         exp ...)]))
+
+
 ;; !!! all the binding things should do this???
 ;; !!! otherwise ensure violations blow out the entire file
 (define-syntax (ensuring stx)
@@ -393,7 +403,7 @@ validity, and test thoroughness results are reported. No grade information is re
   (syntax-case stx ()
     [(_ n item ...)
      (if (identifier? #'n)
-         #'(begin ;recovery-point n !!!
+         #'(begin
              (assert-context--@problem)
              (parameterize ([context (cons (get-htdf* `n) (context))])
                (header (format "~a: " (car (context)))
