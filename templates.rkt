@@ -23,10 +23,11 @@
          (let* ([defns (htdf-defns (car (context)))]
                 [defn  (and (pair? defns) (car defns))]
                 [body  (and (fn-defn? defn) (caddr defn))]                     
-                [local-defns    (and (list? body) (= (length body) 3) (eqv? (car body) 'local) (cadr body))]                     
-                [enough-locals? (and local-defns (>= (length local-defns) (length '(fn-name ...))))]
+                [local-defns    (and (list? body) (= (length body) 3) (eqv? (car body) 'local) (cadr body))]
+
+               ;[enough-locals? (and local-defns (>= (length local-defns) (length '(fn-name ...))))]
                 
-                [fn-name        (and enough-locals? (find-defn 'fn-name local-defns))]
+                [fn-name        (and local-defns (find-defn 'fn-name local-defns))]
                 ...)
            (grade-prerequisite 'other "body of function must be filled in with encapsulated type templates" local-defns
              body-expr ...)))]))
