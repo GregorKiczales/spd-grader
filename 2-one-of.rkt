@@ -9,10 +9,12 @@
 
 (define-syntax (grade-2-one-of stx)
   (syntax-case stx (cond)
-      [(_ n (p ...) (cond sp ...))
-       #'(grade-2-one-of-fn 'n '(p ...) '(sp ...))]))
+      [(_ n (p ...) (cond [q a] ...))
+       #'(grade-2-one-of* 'n '(p ...) '(q ...) '(mnc))]
+      [(_ n (p ...) (cond [q a] ...) (mnc ...))
+       #'(grade-2-one-of* 'n '(p ...) '(q ...) '(mnc ...))]))
 
-(define (grade-2-one-of-fn n params sol-pairs)
+(define (grade-2-one-of* n params qs mncs)
   (assert-context--@htdf)
   (let* ([htdf     (car (context))]
          [defns    (htdf-defns htdf)]
@@ -20,9 +22,9 @@
                         (> (length defns) (sub1 n))
                         (list-ref defns (sub1 n)))])
 
-    (check-2-one-of htdf defn params sol-pairs)))
+    (check-2-one-of htdf defn params qs mncs)))
 
-(define (check-2-one-of htdf defn sol-params sol-pairs)
+(define (check-2-one-of htdf defn sol-params sol-qs mncs)
   (header "2-one-of:"
     (ensuring
      (begin
@@ -35,14 +37,15 @@
               [sub-pairs   (cdr cnd)]
               [sub-qs      (map car sub-pairs)]
               [sub-sub-qs  (get-sub-qs sub-qs)]
+              [sub-as      (map cadr sub-pairs)]
 
-              [sol-qs      (rename-params sub-params sol-params (map car sol-pairs) (fn-defn-name defn))]
+              [sol-qs      (rename-params sub-params sol-params sol-qs (fn-defn-name defn))]
               [sol-sub-qs  (get-sub-qs sol-qs)]
 
               [invalid-sub-qs (filter (lambda (pq) (not (memf (lambda (opq) (qequal? pq opq)) sol-sub-qs))) sub-sub-qs)])
 
 
-         (weights (.1 .4 .2 *)
+         (weights (.1 .25 .15 .25 .25)
            (grade-template-origin (2-one-of))
            (rubric-item 'template-intact
                         (null? invalid-sub-qs)
@@ -53,8 +56,8 @@
                               [else
                                (format " - ~a are not formed according to template rules" (list->text invalid-sub-qs))]))
            (rubric-item 'template-intact
-                        (and (pair? sub-pairs) (= (length sub-pairs) (length sol-pairs)))
-                        "cond expression has ~a cases (question/answer pairs)" (length sol-pairs))
+                        (and (pair? sub-pairs) (= (length sub-pairs) (length sol-qs)))
+                        "cond expression has ~a cases (question/answer pairs)" (length sol-qs))
            (combine-scores
             (weights* 1.0 '(*)
               (for/list ([n     (in-naturals 0)]
@@ -65,7 +68,12 @@
                                   (qequal? (list-ref sub-qs n)
                                            sol-q))
                              "~a question is properly simplified"
-                             (number->ordinal (add1 n))))))))))))
+                             (number->ordinal (add1 n))))))
+           (rubric-item 'template-intact
+                        (andmap (lambda (a) (calls-none? a mncs)) sub-as)
+                        "cond answers must not call~a~a"
+                        (if (null? (cdr mncs)) "" " any of")
+                        (list->text mncs))))))))
 
 (define (rename-params sub-params sol-params qs fn-name)
   (let loop ((sub-params sub-params)
