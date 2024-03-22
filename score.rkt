@@ -144,8 +144,9 @@
       (error* "Reductions total to more than 1. (Total to ~a.)" reduction-total-weight))
 
     (score #f 1
-           (round* (- (foldl + 0 (map * (map score-w scores) (map score-m scores)))
-                      (foldl + 0 (map reduction-w applied-reductions)))
+           (round* (max 0
+                        (- (foldl + 0 (map * (map score-w scores) (map score-m scores)))
+                           (foldl + 0 (map reduction-w applied-reductions))))
                    2)
            all
 ;           (map (lambda (x)
