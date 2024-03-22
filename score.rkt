@@ -201,20 +201,23 @@
                  (raise-syntax-error #f "Expected number." stx (car e))])))))
 
 
-(define (score-max . scores) (apply score-max/min >= scores))
-(define (score-min . scores) (apply score-max/min <= scores))
+(define (score-max . scores) (score-max/min 'score-max >= scores))
+(define (score-min . scores) (score-max/min 'score-min <= scores))
 
-(define (score-max/min comp . scores)
-  (let ([scores (filter score? scores)])
-    (foldr (lambda (s1 s2)
-             (cond [(not (= (score-w s1) (score-w s2)))
-                    (error "~a (weighted ~a) and ~a (weighted ~a) should have same weight."
-                           (score-m s1) (score-w s1)
-                           (score-m s2) (score-w s2))]
-                   [(comp (score-m s1) (score-m s2)) s1]
-                   [else s2]))
-           (last scores)
-           (take scores (sub1 (length scores))))))
+(define (score-max/min who comp scores)
+  (unless (pair? scores)
+    (error who "called with no scores"))
+  
+  (let loop ([scores (filter score? scores)]
+             [rsf (first scores)])
+    (cond [(null? scores) rsf]
+          [(not (= (score-w rsf) (score-w (car scores))))
+           (error who "not all scores have same weight")]
+          [else
+           (loop (cdr scores)
+                 (if (comp (score-m rsf) (score-m (car scores)))
+                     rsf
+                     (car scores)))])))
 
 (define (score-* percent s)
   (score (score-header? s)
