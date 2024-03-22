@@ -149,15 +149,6 @@
                            (foldl + 0 (map reduction-w applied-reductions))))
                    2)
            all
-;           (map (lambda (x)
-;                  (cond [(score? x) x]
-;                        [(reduction? x)
-;                         (score #t (reduction-topic x) (reduction-w x) 0 '() (list (reduction-msg x)))]))
-;           (filter (lambda (x)
-;                     (not (and (reduction?
-;                          (or (score? x)
-;                             (and (reduction? x) (reduction-applied? x))))
-;                        all))
            '())))
 
 
