@@ -213,8 +213,8 @@
                            (score-m s2) (score-w s2))]
                    [(comp (score-m s1) (score-m s2)) s1]
                    [else s2]))
-           (car scores)
-           (cdr scores))))
+           (last scores)
+           (take scores (sub1 (length scores))))))
 
 (define (score-* percent s)
   (score (score-header? s)
