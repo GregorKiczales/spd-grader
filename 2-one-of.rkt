@@ -9,12 +9,10 @@
 
 (define-syntax (grade-2-one-of stx)
   (syntax-case stx (cond)
-      [(_ n (p ...) (cond [q a] ...))
-       #'(grade-2-one-of* 'n '(p ...) '(q ...) '(mnc))]
-      [(_ n (p ...) (cond [q a] ...) (mnc ...))
-       #'(grade-2-one-of* 'n '(p ...) '(q ...) '(mnc ...))]))
+    [(_ n (p ...) (cond [q a] ...))
+     #'(grade-2-one-of* 'n '(p ...) '(q ...) '(a ...))]))
 
-(define (grade-2-one-of* n params qs mncs)
+(define (grade-2-one-of* n sol-params sol-questions sol-answers)
   (assert-context--@htdf)
   (let* ([htdf     (car (context))]
          [defns    (htdf-defns htdf)]
@@ -22,9 +20,9 @@
                         (> (length defns) (sub1 n))
                         (list-ref defns (sub1 n)))])
 
-    (check-2-one-of htdf defn params qs mncs)))
+    (check-2-one-of htdf defn sol-params sol-questions sol-answers)))
 
-(define (check-2-one-of htdf defn sol-params sol-qs mncs)
+(define (check-2-one-of htdf defn sol-params sol-qs sol-as)  
   (header "2-one-of:"
     (ensuring
      (begin
@@ -45,7 +43,7 @@
               [invalid-sub-qs (filter (lambda (pq) (not (memf (lambda (opq) (qequal? pq opq)) sol-sub-qs))) sub-sub-qs)])
 
 
-         (weights (.1 .25 .15 .25 .25)
+         (weights (.1 .40 .25 .25)
            (grade-template-origin (2-one-of))
            (rubric-item 'template-intact
                         (null? invalid-sub-qs)
@@ -68,12 +66,7 @@
                                   (qequal? (list-ref sub-qs n)
                                            sol-q))
                              "~a question is properly simplified"
-                             (number->ordinal (add1 n))))))
-           (rubric-item 'template-intact
-                        (andmap (lambda (a) (calls-none? a mncs)) sub-as)
-                        "cond answers must not call~a~a"
-                        (if (null? (cdr mncs)) "" " any of")
-                        (list->text mncs))))))))
+                             (number->ordinal (add1 n))))))))))))
 
 (define (rename-params sub-params sol-params qs fn-name)
   (let loop ((sub-params sub-params)
