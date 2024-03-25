@@ -24,12 +24,12 @@
                 [defn  (and (pair? defns) (car defns))]
                 [body  (and (fn-defn? defn) (caddr defn))]                     
                 [local-defns    (and (list? body) (= (length body) 3) (eqv? (car body) 'local) (cadr body))]
-
-               ;[enough-locals? (and local-defns (>= (length local-defns) (length '(fn-name ...))))]
                 
                 [fn-name        (and local-defns (find-defn 'fn-name local-defns))]
                 ...)
-           (grade-prerequisite 'other "body of function must be filled in with encapsulated type templates" local-defns
+           (grade-prerequisite 'other
+               "body of function must be filled in with encapsulated type templates"
+               (not (null? local-defns))
              body-expr ...)))]))
 
 (define-syntax (guard-template-fn-grading stx)
