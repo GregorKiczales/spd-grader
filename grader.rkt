@@ -548,9 +548,8 @@ validity, and test thoroughness results are reported. No grade information is re
          [defns   (htdf-defns htdf)]
          [defn    (and (pair? defns) (car defns))]
          [body    (and defn (caddr defn))]
-         [stub?   (or (not (list? body))
-                      (equal? body 'empty)
-                      (equal? body '()))])
+         ;; !!! there should be a stub function based on value? in check-steps
+         [stub?   (member body '(true false #t #f empty '() ""))])
     (grade-prerequisite 'additional-tests "additional-tests: function definition must be more than a stub" (not stub?)
       (check-additional-tests fn-name tests min))))
 
