@@ -1,6 +1,7 @@
 #lang racket
 
-(require racket/list)
+(require racket/list
+         spd-grader/utils)
 
 (module+ test
   (require rackunit))
@@ -287,6 +288,21 @@
                    [(if cond and or define local local-define local-body lambda #;call) (recur)])))
     #f))
 
+(define (calls-any?  f0 names)
+  (let/cc return 
+    (walk-form (datum->syntax #f f0)
+               '()
+               (lambda (kind stx e ctx env in-fn-defn recur)
+                 (walker-case kind
+                   [(value constant null bound free) '()]
+                   [(call)
+                    (let ([name (syntax->datum (car e))])
+                      (if (memq name names)
+                          (return #t)
+                          (recur)))]
+                   [(if cond and or define local local-define local-body lambda #;call) (recur)])))
+    #f))
+
 (define (calls-none?  f0 names)
   (let/cc return 
     (walk-form (datum->syntax #f f0)
@@ -507,7 +523,7 @@
               (contains-exp? (cadadr q) a)))))
   
 
-
+#;#;
 ;; sexp? -> boolean?
 (define (value? f)
   (or (number? f)

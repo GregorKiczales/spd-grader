@@ -1,6 +1,7 @@
 #lang racket/base
 
 (require racket/function
+         racket/class
          racket/pretty
          racket/string
          racket/list
@@ -80,6 +81,33 @@
       (regexp-replace #rx"\n$" (get-output-string p) ""))))
 
 (current-value-printer default-value-printer)
+
+
+(define (value? x) ;is x self-evaluating?
+  (or (number? x)
+      (string? x)
+      (member x '(true false #t #f empty))
+      (cons-list? x)
+      (and (pair? x) (eqv? (car x) 'quote))
+      (struct? x)
+      (object? x))) ;all that's left is an image or not a value
+
+(define (constant? f) ;why doesn't this include numbers?
+  (member f '(true false empty empty-image "")))
+
+(define (cons-list? x)
+  (or (eqv? x 'empty)
+      (and (pair? x)
+           (or (and (eqv? (car x) 'cons)
+                    (value? (cadr x))
+                    (cons-list? (caddr x)))
+               (and (eqv? (car x) 'list)
+                    (andmap value? (cdr x)))))))
+
+(define (true-value? x)  (member x '(#t true)))
+(define (false-value? x) (member x '(#f false)))
+
+
 
 
 
