@@ -29,7 +29,7 @@
                 ...)
            (grade-prerequisite 'other
                "body of function must be filled in with encapsulated type templates"
-               (not (null? local-defns))
+               (and local-defns (not (null? local-defns)))
              body-expr ...)))]))
 
 (define-syntax (guard-template-fn-grading stx)
