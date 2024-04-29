@@ -127,15 +127,15 @@ NOTE: This problem will be autograded, and ALL OF THE FOLLOWING ARE ESSENTIAL
    (let* ([sexps (map elt-sexp (elts))]
           [htdf (car (context))]
           [defns (htdf-defns htdf)]
-          [defn  (car defns)]
+          [defn  (and (= (length defns) 1) (car defns))]
           [to-tags (htdf-template-origins htdf)]
           [to-tag  (and (pair? to-tags) (car to-tags))]
           [all-bia-fns (remove-duplicates   ;allow graders to specify abs-fns we don't know like map2
                         (append (apply append (map all-fns (map cadr max-marks-and-comps))) 
                                 BIA-FNS))]
           ;; specially allow and/or to be used in the grade-use-bia-fn composition/combinations
-          [called-bia-fns (special-calls (caddr defn) all-bia-fns)]
-          [comp (and defn (infer-bia-fn-composition (datum->syntax #f defn) all-bia-fns))])
+          [called-bia-fns (and defn (special-calls (caddr defn) all-bia-fns))]
+          [comp           (and defn (infer-bia-fn-composition (datum->syntax #f defn) all-bia-fns))])
 
      (ensure (= (length defns) 1)          "(@htdf ~a) must define single top-level function" fn-name)
      (ensure (pair? (caddr defn))          "~a function definition must be more than stub" fn-name)
