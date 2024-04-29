@@ -289,7 +289,7 @@
 
   ;; consume and tally ... <additional-params>; produce what's left
   (define (check-... expr [prefix ""])
-    (let loop ([sub expr]
+    (let loop ([sub (if (list? expr) expr empty)]
                [sol (cons '... (additional-params))])
       (cond [(empty? sol) sub]
             [else
