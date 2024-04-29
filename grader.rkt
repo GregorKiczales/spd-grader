@@ -407,7 +407,7 @@ validity, and test thoroughness results are reported. No grade information is re
              (assert-context--@problem)
              (with-handlers ([exn:fail?
                               (lambda (e)
-                                (score-it 'other 1 0 #f "(@htdf ~a): tag not found." `n))])
+                                (score-it 'other 1 0 #f "(@htdf ~a): could not find tag." `n))])
                (parameterize ([context (cons (get-htdf* `n) (context))])
                  (let* ([htdf (car (context))]
                         [defns (htdf-defns htdf)]
@@ -418,7 +418,7 @@ validity, and test thoroughness results are reported. No grade information is re
              (assert-context--@problem)
              (with-handlers ([exn:fail?
                               (lambda (e)
-                                (score-it 'other 1 0 #f "(@htdf ~a): tag not found." `n))])
+                                (score-it 'other 1 0 #f "(@htdf ~a): could not find tag." `n))])
                (parameterize ([context (cons (get-htdf* `n) (context))])
                  (let* ([htdf (car (context))]
                         [defns (htdf-defns htdf)]
