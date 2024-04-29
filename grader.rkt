@@ -405,26 +405,26 @@ validity, and test thoroughness results are reported. No grade information is re
      (if (identifier? #'n)
          #'(begin
              (assert-context--@problem)
-             (with-handlers ([exn:fail?
-                              (lambda (e)
-                                (score-it 'other 1 0 #f "(@htdf ~a): could not find tag." `n))])
-               (parameterize ([context (cons (get-htdf* `n) (context))])
-                 (let* ([htdf (car (context))]
-                        [defns (htdf-defns htdf)]
-                        [n (and (pair? defns) (car defns))])
-                   (header (format "~a: " htdf)
-                     (weights (*) item ...))))))
+             (let ([tag (with-handlers ([exn:fail? (lambda (e) #f)]) (cons (get-htdf* `n) (context)))])
+               (if (false? tag)
+                   (score-it 'other 1 0 #f "(@htdf ~a): could not find tag." `n)
+                   (parameterize ([context tag])
+                     (let* ([htdf (car (context))]
+                            [defns (htdf-defns htdf)]
+                            [n (and (pair? defns) (car defns))])
+                       (header (format "~a: " htdf)
+                         (weights (*) item ...)))))))
          #'(begin
              (assert-context--@problem)
-             (with-handlers ([exn:fail?
-                              (lambda (e)
-                                (score-it 'other 1 0 #f "(@htdf ~a): could not find tag." `n))])
-               (parameterize ([context (cons (get-htdf* `n) (context))])
-                 (let* ([htdf (car (context))]
-                        [defns (htdf-defns htdf)]
-                        [@htdf (and (pair? defns) (car defns))]) ;!!! @htdf vs. n is only difference w/ above!!! :(
-                   (header (format "~a: " htdf)
-                     (weights (*) item ...)))))))]))
+             (let ([tag (with-handlers ([exn:fail? (lambda (e) #f)]) (cons (get-htdf* `n) (context)))])
+               (if (false? tag)
+                   (score-it 'other 1 0 #f "(@htdf ~a): could not find tag." `n)
+                   (parameterize ([context tag])
+                     (let* ([htdf (car (context))]
+                            [defns (htdf-defns htdf)]
+                            [@htdf (and (pair? defns) (car defns))]) ;!!! @htdf vs. n is only difference w/ above!!! :(
+                       (header (format "~a: " htdf)
+                         (weights (*) item ...))))))))]))
 
 ;; find helper name and defn such that:
 ;;  primary function definition exists
