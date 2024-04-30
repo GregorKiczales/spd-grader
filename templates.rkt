@@ -27,10 +27,7 @@
                 
                 [fn-name        (and local-defns (find-defn 'fn-name local-defns))]
                 ...)
-           (grade-prerequisite 'other
-               "body of function must be filled in with encapsulated type templates"
-               (and local-defns (not (null? local-defns)))
-             body-expr ...)))]))
+           body-expr ...))]))
 
 (define-syntax (guard-template-fn-grading stx)
   (syntax-case stx ()
