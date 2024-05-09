@@ -510,7 +510,7 @@ validity, and test thoroughness results are reported. No grade information is re
     (let* ([htdf (car (context))]
            [sigs (htdf-sigs htdf)])
       (if (not (<= 1 n (length sigs)))
-          (score-it 'signature 1 0 #f "Signature: not found.")
+          (score-it 'signature 1 0 #f "Signature: Could not find @signature tag.")
           (check-signature (subst 'false #f (list-ref sigs (sub1 n)))
                            (subst 'false #f (cons '@signature sol)))))))
 
@@ -882,7 +882,7 @@ validity, and test thoroughness results are reported. No grade information is re
                 [defn  (and (pair? defns)
                             (>= (length defns) n)
                             (list-ref defns (sub1 n)))])
-           (grade-prerequisite 'other (format "Cannot find the ~a function definition" (number->ordinal n)) defn
+           (grade-prerequisite 'other (format "Could not find the ~a function definition" (number->ordinal n)) defn
              (check-constants-use defn 'constants (list-ref htdf n) false))))]))
 
 (define-syntax (grade-tests-constants-use stx)
@@ -1245,9 +1245,9 @@ validity, and test thoroughness results are reported. No grade information is re
                  '(*)
                  (append (for/list ([n (in-naturals 1)]
                                     [req required])
-                           (rubric-item 'template-origin (member req sub) "~a is present" req))
+                           (rubric-item 'template-origin (member req sub) "~a should be present" req))
                          (for/list ([pna present-not-allowed])
-                           (score-it 'template-origin 1 0 #f "~a: incorrect (not allowed)." pna))))))))
+                           (rubric-item 'template-origin #f               "~a should not be present" pna))))))))
 
 
 
