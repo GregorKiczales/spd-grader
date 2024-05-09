@@ -86,6 +86,7 @@
 (define (value? x) ;is x self-evaluating?
   (or (number? x)
       (string? x)
+      (char?   x)
       (member x '(true false #t #f empty))
       (cons-list? x)
       (and (pair? x) (eqv? (car x) 'quote))
