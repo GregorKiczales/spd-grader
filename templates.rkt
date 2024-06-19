@@ -6,6 +6,7 @@
          "walker.rkt")
 
 (provide grade-encapsulated-template-fns
+         guard-template-fn-grading
 
          grade-questions-intact
          grade-questions-intact/body
