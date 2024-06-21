@@ -13,7 +13,9 @@
          grade-nr-intact grade-mr-intact grade-nh-intact
          grade-try-catch grade-no-try-catch
          grade-accumulator-intact
-         grade-prohibited-calls)
+         grade-prohibited-calls
+
+         filled-and-calls?)
 
 
 (define-syntax (grade-encapsulated-template-fns stx)
