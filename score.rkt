@@ -9,7 +9,7 @@
          message
          score-it
          rubric-item
-         rubric
+        ;rubric
          
          reduce-it
          
@@ -70,7 +70,7 @@
       (reduction topic w correct? (message #f "Reduction not applied: ~a." (apply format fmt-ctl fmt-args)))    ;display-score hides these
       (reduction topic w correct? (message #f "Reduction: ~a."             (apply format fmt-ctl fmt-args)))))
 
-
+#;
 (define-syntax (rubric stx)
   (syntax-case stx ()
     [(_ TOPIC PREFIX [Q V T] ...)
