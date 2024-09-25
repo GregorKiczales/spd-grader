@@ -652,6 +652,30 @@
                                             [else (cons (car los)
                                                         (foo (cdr los)))]))))
                 #t)
+
+  (check-equal? (recursive? #'(define (rectangles n w h c)
+                                (local [(define dw (- w (/ (- h w) (sub1 n))))
+                                        (define dh (+ h (/ (- w h) (sub1 n))))]
+                                  (foldr overlay empty-image
+                                         (build-list n (lambda (x)
+                                                         (rectangles x dw dh c)))))))
+                #t)
+
+  (check-equal? (recursive? #'(define (rectangles n w h c)
+                                (local [(define dw (- w (/ (- h w) (sub1 n))))
+                                        (define dh (+ h (/ (- w h) (sub1 n))))
+                                        (define (rect x) (rectangles x dw dh c))]
+                                  (foldr overlay empty-image
+                                         (build-list n rect)))))
+                #t)
+
+  (check-equal? (recursive? #'(define (rectangles n w h c)
+                                (local [(define dw (- w (/ (- h w) (sub1 n))))
+                                        (define dh (+ h (/ (- w h) (sub1 n))))
+                                        (define (rect x) (rectangles x dw dh c))]
+                                  (rect 1))))
+                #t)
+
   
   
   (check-equal? (recursive? (syntax (define (foo los)
