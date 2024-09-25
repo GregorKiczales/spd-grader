@@ -781,12 +781,6 @@ validity, and test thoroughness results are reported. No grade information is re
 
            (define (one-score str . args) (score-it 'test-thoroughness 1 % #f (format "Test thoroughness (known fault detection): ~a." (apply format str args))))
            
-           ;(score-it 'test-thoroughness 1 1 #f "Test thoroughness (known fault detection): correct.")]
-           ;(score-it 'test-thoroughness 1 % #f "Test thoroughness (known fault detection): incorrect - failed to detect any known faulty functions.")]
-           ;(score-it 'test-thoroughness 1 % #f "Test thoroughness (known fault detection): incorrect - tests produced errors for all known faulty functions.")]
-           ;(score-it 'test-thoroughness 1 % #f "Test thoroughness (known fault detection): incorrect - failed to detect ~a known faulty functions."          nmissed)]
-           ;(score-it 'test-thoroughness 1 % #f "Test thoroughness (known fault detection): incorrect - tests produced errors for ~a known faulty functions." nerror)]
-           ;(score-it 'test-thoroughness 1 % #f "Test thoroughness (known fault detection): incorrect - failed to detect ~a known faulty functions, and tests produced errors for ~a other known faulty functions." nmissed nerror)
            (cond [(= ndetected ndefns) (one-score "correct")]
 
                  [(= nmissed   ndefns) (one-score "incorrect - failed to detect any known faulty functions")]
@@ -1036,7 +1030,12 @@ validity, and test thoroughness results are reported. No grade information is re
            
            (and (pair? must-use-free)
                 (rubric-item 'other
-                             (and sub-free (andmap (lambda (s) (member s sub-free)) must-use-free))
+                             (let loop ([sub-free sub-free]
+                                        [must-use-free must-use-free])
+                               (or (empty? must-use-free)
+                                   (and (memq (car must-use-free) sub-free)
+                                        (loop (remove (car must-use-free) sub-free) ;consume 1 use
+                                              (cdr must-use-free)))))               ;and consume one requirement
                              "Expression uses required CONSTANTs"))
            
            (rubric-item 'eval-etc
