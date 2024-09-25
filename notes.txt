@@ -1,5 +1,26 @@
 
 
+grade-dd-rules... default to (current-data-design)
+
+rename grade-encapsulated-template-fns to with-encapsulated-fn-designs
+
+
+grade-signature|template... default to (current-function-design)
+
+
+These currently take required fn-name first argument (fn-defn for the ones that aren't syntax):
+         grade-questions-intact
+         grade-questions-intact/body
+         grade-nr-intact grade-mr-intact grade-nh-intact
+         grade-try-catch grade-no-try-catch
+         grade-accumulator-intact
+         grade-prohibited-calls
+So they could switch to having two forms, one that pulls from (current-function-design) and one that takes the fn-design explicitly.
+
+
+
+========
+
 grade-...    these quote code and pull items to grade from file context
 
 grade-...*   these do no quoting, they do pull items to grade from file context
@@ -52,7 +73,7 @@ Inside ALL the above, (get-htdf) (get-defns) (get-defn 'foo) all work
 what if there was:
 
 (struct htdd (tag structs type-comment examples origin template)) 
-(struct htdf (tag sig purpose checks origin template defn))
+(struct htdf (tag sig purpose checks origin template defn)) ;all should be syntax
 
 in real terms, is that any different than just having
 
@@ -61,7 +82,7 @@ in real terms, is that any different than just having
 
 
 
-Below all (should) take an optional first argument that is whatever the above bound the parameter to.
+Below all (should) take an optional first argument that is whatever the above bound the parameter to.  Or use something like parameterize when it's needed?
 
 
 grade-signature
