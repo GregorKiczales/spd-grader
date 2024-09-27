@@ -458,8 +458,8 @@
                    [else
                     (for ([type types]
                           [param params])
-                      (cond [(atomic-nd?   type) (additional-params (append (additional-params) (list param)))]
-                            [(atomic-d? type) (additional-params (append (additional-params) (list param)))]
+                      (cond [(atomic-nd? type) (additional-params (append (additional-params) (list param)))]
+                            [(atomic-d?  type) (additional-params (append (additional-params) (list param)))]
                             [else
                              (primary-type type)
                              (primary-param param)]))])
