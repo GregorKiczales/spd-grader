@@ -437,11 +437,12 @@
   (when (> (length (filter (lambda (x) (and (not (atomic-nd? x)) (not (atomic-d? x)))) types)) 1)
     (error* "More than one type is non-atomic ~a" types))
 
-  
-  (let ([params (cdadr defn)])      
+
+  (let ([params (cdadr defn)])
     (cond [(and (not (= (length params) (length types)))
                 (not (memq 'allow-one-arg options))
-                (not (= (length params) 1)))
+               ;(not (= (length params) 1)) ;!!! Was allowing one-arg @template to be correct
+                )
            (list (rubric-item 'template #f "Incorrect number of parameters."))]
           [else
            (fn-name (caadr defn))
