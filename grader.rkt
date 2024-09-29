@@ -472,11 +472,13 @@ validity, and test thoroughness results are reported. No grade information is re
      #'(begin
          (assert-context--@problem)
          (let ([handler-name (find-bb-handler 'option)])
-           (parameterize ([context (cons (get-htdf* handler-name) (context))])
-             (header (format "~a: " (car (context)))
-               (let* ([defns (htdf-defns (car (context)))]
-                      [handler-defn (and (pair? defns) (car defns))])
-                 (weights (*) item ...))))))]))
+           (if (false? handler-name)
+               (weights (*) (rubric-item 'other #f "big-bang ~a handler - could not find ~a option to big-bang" 'option 'option))
+               (parameterize ([context (cons (get-htdf* handler-name) (context))])
+                 (header (format "~a: " (car (context)))
+                   (let* ([defns (htdf-defns (car (context)))]
+                          [handler-defn (and (pair? defns) (car defns))])
+                     (weights (*) item ...)))))))]))
 
 (define (find-bb-handler option)
   (let* ([htdf '(@htdf main)]
@@ -490,9 +492,8 @@ validity, and test thoroughness results are reported. No grade information is re
                              (assq 'to-draw alist))
                          (assq option alist)))])
 
-    (if entry
-        (cadr entry)
-        (rubric-item "big-bang ~a handler - could not find ~a option to big-bang" option option))))
+    (and entry
+         (cadr entry))))
 
 
   
