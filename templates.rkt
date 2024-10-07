@@ -56,7 +56,7 @@
   (let* ([fn-name (and (fn-defn? fn-defn) (caadr fn-defn))]
          [what (format "~a - cond questions intact:" fn-name)])
     (guard-template-fn-grading fn-name 'template-intact what
-                               (header "cond questions intact"
+                               (header what
                                  (check-questions/types types fn-defn)))))
 
 (define (grade-questions-intact/body* fn-defn params body)  
@@ -74,7 +74,8 @@
                                             what))))
 
 
-
+;; !!! this just checks for a recursion, not a proper natural recursion
+;; !!! it really should also consume the type
 (define-syntax (grade-nr-intact stx)
   (syntax-case stx ()
     [(_ fn-name) #'(grade-nr-intact fn-name 1)]
