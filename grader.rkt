@@ -361,9 +361,9 @@ validity, and test thoroughness results are reported. No grade information is re
      #'(begin
          (assert-context--top-level)
          (header (format "~a: " `(@problem ,n))
-                 (per-problem-error-handling `(@problem ,n)
-                   (parameterize ([context (cons (get-problem* n) (context))])
-                     (weights (*) item ...)))))]))
+           (per-problem-error-handling `(@problem ,n)
+             (parameterize ([context (cons (get-problem* n) (context))])
+               (weights (*) item ...)))))]))
 
 
 (define (not-graded)
@@ -631,23 +631,25 @@ validity, and test thoroughness results are reported. No grade information is re
         [else
          (let* ([names (map (lambda (x) (gensym)) tests)]
                 [results
-                 (calling-evaluator #f    ;#f because %%call-thunks-with-handler
-                                    ;;    ;wraps actual student code evaluation
-                   `(%%call-thunks-with-handler
-                     (local ,(for/list ([name names]
-                                        [test tests])
-                               `(define (,name _) ,(xform-test test)))
-                       (list ,@names))))]
+                 (with-handlers ([exn:fail? (lambda (e) #f)])  ;error loading test expressions
+                   ((evaluator)
+                    `(%%call-thunks-with-handler               ;per-test 'error evaluating test
+                      (local ,(for/list ([name names]
+                                         [test tests])
+                                `(define (,name _) ,(xform-test test)))
+                        (list ,@names)))))]
                 
 
                 [ntests (length tests)]
-                [npass  (count (lambda (x) (eqv? x #t)) results)]
-                [nfail  (count (lambda (x) (eqv? x #f)) results)]
-                [nerror (count (lambda (x) (eqv? x 'error)) results)]
+                [npass  (and results (count (lambda (x) (eqv? x #t)) results))]
+                [nfail  (and results (count (lambda (x) (eqv? x #f)) results))]
+                [nerror (and results (count (lambda (x) (eqv? x 'error)) results))]
                 
-                [%      (if (zero? ntests) 0 (/ (max 0 (- ntests (+ nfail nerror))) ntests))])
+                [%      (and results (if (zero? ntests) 0 (/ (max 0 (- ntests (+ nfail nerror))) ntests)))])
            
-           (cond [(zero? ntests)      (score-it topic 1 0 #f "~a tests: no tests submitted." Camel)] ;can't happen for additional, unlikely for submitted
+           (cond [(false? results)    (score-it topic 1 0 #f "~a tests: syntax error in one or more tests." Camel)]
+
+                 [(zero? ntests)      (score-it topic 1 0 #f "~a tests: no tests submitted." Camel)] ;can't happen for additional, unlikely for submitted
                  [(= npass ntests)    (score-it topic 1 1 #f "~a tests: correct." Camel)]
                  
                  [(= nfail  ntests)   (score-it topic 1 0 #f "~a tests: incorrect - every ~a test failed." Camel lower)]
@@ -670,26 +672,29 @@ validity, and test thoroughness results are reported. No grade information is re
                 [criteria-names (map (lambda (x) (gensym "cond")) checks)]
                   
                 [results
-                 (calling-evaluator #f
-                  `(local [,@(for/list ([c    tests]
-                                        [name test-names])
-                               `(define (,name _)
-                                  (list ,(subst 'list fn-name (cadr c)) ;...trying to make local work with 1985 hygiene !!! do it right w/ local
-                                        ,(caddr c))))
+                 (with-handlers ([exn:fail? (lambda (e) #f)])    ;error loading test argument expressions
+                   ((evaluator)
+                    `(local [,@(for/list ([c    tests]
+                                          [name test-names])
+                                 `(define (,name _)
+                                    (list ,(subst 'list fn-name (cadr c)) ;...trying to make local work with 1985 hygiene !!! do it right w/ local
+                                          ,(caddr c))))
 
-                           (define (%%all-checks ,@params)
-                             (and ,@checks))]
-                     
-                     (%%check-validity (list ,@test-names) %%all-checks)))]
+                             (define (%%all-checks ,@params)
+                               (and ,@checks))]
+                       
+                       (%%check-validity (list ,@test-names) %%all-checks))))]
+
 
                 [ntests (length tests)]
-                [npass  (count (lambda (x) (eqv? x #t)) results)]
-                [nfail  (count (lambda (x) (eqv? x #f)) results)]
-                [nerror (count (lambda (x) (eqv? x 'error)) results)]
+                [npass  (and results (count (lambda (x) (eqv? x #t)) results))]
+                [nfail  (and results (count (lambda (x) (eqv? x #f)) results))]
+                [nerror (and results (count (lambda (x) (eqv? x 'error)) results))]
 
-                [% (/ npass ntests)])
+                [%      (and results (/ npass ntests))])
 
-           (cond [(= npass  ntests) (score-it 'test-validity 1 1 #f "Test validity: correct.")]
+           (cond [(false? results)  (score-it 'test-validity 1 0 #f "Test validity: syntax error in one or more tests.")]
+                 [(= npass  ntests) (score-it 'test-validity 1 1 #f "Test validity: correct.")]
                  
                  [(= nfail  ntests) (score-it 'test-validity 1 0 #f "Test validity: incorrect, every test is invalid.")]
                  [(= nerror ntests) (score-it 'test-validity 1 0 #f "Test validity: incorrect, every test caused an error.")]
@@ -706,16 +711,20 @@ validity, and test thoroughness results are reported. No grade information is re
   (cond [(< (length tests) 2) (score-it 'test-thoroughness 1 0 #f "Test thoroughness (test argument coverage): incorrect - at least 2 tests are required.")]
         [else
          (let* ([tests (filter not-check-satisfied? tests)]
-                [lo-args-and-result  (get-lo-args-and-result fn-name tests)]
-                [lo-args  (map car (filter pair? lo-args-and-result))]
+                [lo-args-and-result  (get-lo-args-and-result fn-name tests)]  ;syntax error loading all test expressions
+                [lo-args             (and lo-args-and-result
+                                          (map car (filter pair? lo-args-and-result)))]
                  
-                [aa-check-names (map (lambda (x) (gensym)) aa-checks)]
-                [pa-check-names (map (lambda (x) (gensym)) pa-checks)]
+                [aa-check-names      (map (lambda (x) (gensym)) aa-checks)]
+                [pa-check-names      (map (lambda (x) (gensym)) pa-checks)]
 
-                [equal-positions (if (null? lo-args)               ;all might have errored
-                                     '()
-                                     (filter (lambda (p) (not (member p lop))) (test-args-equal-positions lo-args)))])
+                [equal-positions     (and lo-args-and-result
+                                          (if (null? lo-args)               ;all might have errored
+                                              '()
+                                              (filter (lambda (p) (not (member p lop))) (test-args-equal-positions lo-args))))])
 
+           (if (false? lo-args-and-result)
+               (score-it 'test-validity 1 0 #f "Test validity: syntax error in one or more tests.")
 
            (grade-prerequisite 'test-thoroughness
                "A set of tests must not have the same argument for any given parameter"
@@ -744,7 +753,7 @@ validity, and test thoroughness results are reported. No grade information is re
                
                (cond [(> nerror 0) (score-it 'test-thoroughness 1 0 #f "Test thoroughness (test argument coverage): incorrect - one or more tests caused an error.")]
                      [(= % 1)      (score-it 'test-thoroughness 1 1 #f "Test thoroughness (test argument coverage): correct.")]
-                     [else         (score-it 'test-thoroughness 1 % #f "Test thoroughness (test argument coverage): incorrect - missing one or more cases.")]))))]))
+                     [else         (score-it 'test-thoroughness 1 % #f "Test thoroughness (test argument coverage): incorrect - missing one or more cases.")])))))]))
 
 
 
@@ -800,14 +809,15 @@ validity, and test thoroughness results are reported. No grade information is re
          [fn-names (map (lambda (ce) (gensym)) checks)])
     (if (empty? checks)
         '()
-        (calling-evaluator #f
-         `(%%call-thunks-with-handler
-           (local ,(for/list ([c     checks]
-                              [fn-nm fn-names])
-                     `(define (,fn-nm _)
-                        (list ,(subst 'list fn-name (cadr c)) ;...trying to make local work with 1985 hygiene !!! do it right w/ walker
-                              ,(caddr c))))
-             (list ,@fn-names)))))))
+        (with-handlers ([exn:fail? (lambda (e) #f)])    ;error loading test argument expressions
+          ((evaluator)
+           `(%%call-thunks-with-handler
+             (local ,(for/list ([c     checks]
+                                [fn-nm fn-names])
+                       `(define (,fn-nm _)
+                          (list ,(subst 'list fn-name (cadr c)) ;...trying to make local work with 1985 hygiene !!! do it right w/ walker
+                                ,(caddr c))))
+             (list ,@fn-names))))))))
 
 (define (xform-test test-expr)
   (if (pair? test-expr)
@@ -816,7 +826,7 @@ validity, and test thoroughness results are reported. No grade information is re
         [(check-member)     `(member?       ,@(cdr test-expr))]
         [(check-equal-sets) `(%%equal-sets? ,@(cdr test-expr))]
         
-        [(check-within)     `(<= (magnitude (- ,(cadr test-expr) (caddr test-expr))) (cadddr ,test-expr))]
+        [(check-within)     `(<= (magnitude (- ,(cadr test-expr) ,(caddr test-expr))) ,(cadddr test-expr))]
         [(check-satisfied)  `(,(caddr test-expr) ,(cadr test-expr))]
 
         [(check-random)
