@@ -404,7 +404,7 @@ validity, and test thoroughness results are reported. No grade information is re
     [(_ n item ...)
      (if (identifier? #'n)
          #'(begin
-             (assert-context--@problem)
+             (assert-context--@problem)   ;!!! make this call grade-htdf*
              (let ([tag (with-handlers ([exn:fail? (lambda (e) #f)]) (cons (get-htdf* `n) (context)))])
                (if (false? tag)
                    (score-it 'other 1 0 #f "(@htdf ~a): could not find tag." `n)
@@ -425,6 +425,19 @@ validity, and test thoroughness results are reported. No grade information is re
                             [@htdf (and (pair? defns) (car defns))]) ;!!! @htdf vs. n is only difference w/ above!!! :(
                        (header (format "~a: " htdf)
                          (weights (*) item ...))))))))]))
+
+(define-syntax (grade-htdf* stx)
+  (syntax-case stx ()
+    [(_ name item ...)
+     #'(begin
+         (assert-context--@problem)
+         (let ([htdf (with-handlers ([exn:fail? (lambda (e) #f)]) (get-htdf* name))])
+           (if (false? htdf)
+               (score-it 'other 1 0 #f "(@htdf ~a): could not find tag." name)
+               (parameterize ([context (cons htdf (context))])
+                 (let* ([defns (htdf-defns htdf)])
+                   (header (format "~a: " htdf)
+                     (weights (*) item ...)))))))]))
 
 ;; find helper name and defn such that:
 ;;  primary function definition exists
@@ -1294,11 +1307,11 @@ validity, and test thoroughness results are reported. No grade information is re
 
 ;; used to enforce proper nesting of grader-* forms in autograder files
 
-(define (assert-context--top-level)  (assert-context empty?      "at top-level inside grade-submission."))
-(define (assert-context--@problem)   (assert-context '@problem   "immediately inside grade-problem."))
-(define (assert-context--@htdd)      (assert-context '@htdd      "immediately inside grade-htdd."))
-(define (assert-context--@htdf)      (assert-context '@htdf      "immediately inside grade-htdf."))
-(define (assert-context--@htdf-main) (assert-context @htdf-main? "immediately inside grade-htdf."))
+(define (assert-context--top-level)  (assert-context empty?      "at top-level inside grade-submission"))
+(define (assert-context--@problem)   (assert-context '@problem   "immediately inside grade-problem"))
+(define (assert-context--@htdd)      (assert-context '@htdd      "immediately inside grade-htdd"))
+(define (assert-context--@htdf)      (assert-context '@htdf      "immediately inside grade-htdf"))
+(define (assert-context--@htdf-main) (assert-context @htdf-main? "immediately inside grade-htdf"))
 
 (define (assert-context guard str)
   (unless (if (symbol? guard)

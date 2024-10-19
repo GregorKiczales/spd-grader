@@ -174,7 +174,7 @@
 
 ;; !!! the remove '@signature is because sometimes this is called on the tag and
 ;; !!! sometimes it is called on just the signature. sigh.
-(define (signature-args   sig) (takef (remove '@signature sig) (lambda (x) (not (eqv? x '->))))) ;!!!cdr added because sig includes @signature
+(define (signature-args   sig) (takef (remove '@signature sig) (lambda (x) (not (eqv? x '->)))))
 (define (signature-result sig) (cadr (member '-> sig)))
 (define (signature-fail?  sig) (equal? (cddr (member '-> sig)) '(or false)))
 
