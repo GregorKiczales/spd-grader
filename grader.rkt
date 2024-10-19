@@ -737,7 +737,7 @@ validity, and test thoroughness results are reported. No grade information is re
                                               (filter (lambda (p) (not (member p lop))) (test-args-equal-positions lo-args))))])
 
            (if (false? lo-args-and-result)
-               (score-it 'test-validity 1 0 #f "Test validity: syntax error in one or more tests.")
+               (score-it 'test-thoroughness 1 0 #f "Test thoroughness: syntax error in one or more tests.")
 
            (grade-prerequisite 'test-thoroughness
                "A set of tests must not have the same argument for any given parameter"
