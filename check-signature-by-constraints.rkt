@@ -92,7 +92,7 @@
 ;;
 
 ;; produce a list of every type or tvar location in sig
-(define-struct loc (type path)) ;elt is type, path is index number(s)
+(define-struct loc (type path))
 
 (define (signature-locations sig)
   (define (walk t path)
@@ -100,11 +100,12 @@
            (cons (make-loc t path)
                  (walk (cadr t) (cons 1 path)))]
           [(function-type? t)
-           (append (walk-args (signature-args t) (cons 'args path))
-                   (append (walk (signature-result t) (cons 'result path))
-                           (if (signature-fail? t)
-                               (list (make-loc #t (cons 'fail? path)))
-                               '())))]
+           (cons (make-loc t path)
+                 (append (walk-args (signature-args t) (cons 'args path))
+                         (append (walk (signature-result t) (cons 'result path))
+                                 (if (signature-fail? t)
+                                     (list (make-loc #t (cons 'fail? path)))
+                                     '()))))]
           [else
            (list (make-loc t path))]))
 
@@ -114,7 +115,7 @@
                       [i (in-naturals 0)])
              (walk t2 (cons i path)))))
   
-  (walk sig '()))
+  (cdr (walk sig '())))
 
 
 (define (make-fn-type-constraints sig locs)
@@ -316,6 +317,10 @@
   ;; contrary to the recipe, start with an all encompassing test
   (check-true
    (check-constraints  '((String Integer A -> B) (B A -> A) (listof A) Arbre -> B)
+                       (make-constraints-from-signature '((String Integer X -> Y) (Y X -> X) (listof X) Arbre -> Y))))
+
+  (check-false
+   (check-constraints  '((String Integer A Foo -> B) (B A -> A) (listof A) Arbre -> B)
                        (make-constraints-from-signature '((String Integer X -> Y) (Y X -> X) (listof X) Arbre -> Y))))
   
   
