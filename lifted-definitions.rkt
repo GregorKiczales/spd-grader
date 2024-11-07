@@ -33,19 +33,22 @@
          (if (null? sol-defns)
              '()
              (let* ([sol-defn      (car sol-defns)]
-                    [lifted-name   (caadr sol-defn)]
+                    [lifted-name   (defn-name sol-defn)]
                     [original-name (drop_n lifted-name)]
                     [sub-defn      (findf (lambda (d)
-                                            (and (fn-defn? d)
-                                                 (name-base? (caadr d) original-name)))
+                                            (name-base? (defn-name d) original-name))
                                           sub-defns)]
                     [nth           (number->ordinal (add1 (occurrences original-name original-names)))])
                (cons (grade-prerequisite 'other (format "~a lifting of ~a exists" nth original-name) sub-defn
                        (header (format "~a lifting of ~a" nth original-name)
-                         (weights (*)
-                           (rubric-item 'other (has_?  (caadr sub-defn) original-name)    "new name has _ after original name")
-                           (rubric-item 'other (equal? (cdadr sub-defn) (cdadr sol-defn)) "parameters")
-                           (rubric-item 'other (equal? (caddr sub-defn) (caddr sol-defn)) "body"))))
+                         (if (fn-defn? sub-defn)
+                             (weights (*)
+                               (rubric-item 'other (has_?  (fn-defn-name       sub-defn) original-name)    "new name has _ after original name")
+                               (rubric-item 'other (equal? (fn-defn-parameters sub-defn) (fn-defn-parameters sol-defn)) "parameters")
+                               (rubric-item 'other (equal? (fn-defn-body       sub-defn) (fn-defn-body sol-defn)) "body"))
+                             (weights (*)
+                               (rubric-item 'other (has_?  (constant-defn-name       sub-defn) original-name)    "new name has _ after original name")
+                               (rubric-item 'other (equal? (constant-defn-value-expr sub-defn) (constant-defn-value-expr sol-defn)) "body")))))
                      (loop (cdr sol-defns)
                            (remove sub-defn sub-defns)
                            (cons original-name original-names))))))))))

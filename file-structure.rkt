@@ -222,5 +222,13 @@
 (define fn-defn-parameters cdadr)
 (define fn-defn-body       caddr)
 
+(define constant-defn-name       cadr)
+(define constant-defn-value-expr caddr)
+
+(define (defn-name x)
+  (if (pair? (cadr x))
+      (fn-defn-name x)
+      (constant-defn-name x)))
+
 
 
