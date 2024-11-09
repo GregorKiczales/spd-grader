@@ -36,7 +36,13 @@
                     [lifted-name   (defn-name sol-defn)]
                     [original-name (drop_n lifted-name)]
                     [sub-defn      (findf (lambda (d)
-                                            (name-base? (defn-name d) original-name))
+                                            (cond [(fn-defn? sol-defn)
+                                                   (and (fn-defn? d)
+                                                        (name-base? (fn-defn-name d) original-name))]
+                                                  [(const-defn? sol-defn)
+                                                   (and (const-defn? d)
+                                                        (name-base? (const-defn-name d) original-name))]
+                                                  [else #f]))
                                           sub-defns)]
                     [nth           (number->ordinal (add1 (occurrences original-name original-names)))])
                (cons (grade-prerequisite 'other (format "~a lifting of ~a exists" nth original-name) sub-defn
@@ -47,8 +53,8 @@
                                (rubric-item 'other (equal? (fn-defn-parameters sub-defn) (fn-defn-parameters sol-defn)) "parameters")
                                (rubric-item 'other (equal? (fn-defn-body       sub-defn) (fn-defn-body sol-defn)) "body"))
                              (weights (*)
-                               (rubric-item 'other (has_?  (constant-defn-name       sub-defn) original-name)    "new name has _ after original name")
-                               (rubric-item 'other (equal? (constant-defn-value-expr sub-defn) (constant-defn-value-expr sol-defn)) "body")))))
+                               (rubric-item 'other (has_?  (const-defn-name       sub-defn) original-name)    "new name has _ after original name")
+                               (rubric-item 'other (equal? (const-defn-value-expr sub-defn) (const-defn-value-expr sol-defn)) "body")))))
                      (loop (cdr sol-defns)
                            (remove sub-defn sub-defns)
                            (cons original-name original-names))))))))))

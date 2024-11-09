@@ -53,7 +53,7 @@
 
 
 (define (grade-questions-intact/types* fn-defn types)
-  (let* ([fn-name (and (fn-defn? fn-defn) (caadr fn-defn))]
+  (let* ([fn-name (and (fn-defn? fn-defn) (fn-defn-name fn-defn))]
          [what (format "~a - cond questions intact:" fn-name)])
     (guard-template-fn-grading fn-name 'template-intact what
                                (header what
