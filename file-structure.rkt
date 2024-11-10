@@ -60,6 +60,9 @@
 (define (get-all-tests)
   (filter check? (map elt-sexp (elts))))
 
+;;
+;; The new check-expect swallows bad syntax errors, so we can't assume all
+;; the expressions in the check are well-formed. 
 (define (get-function-tests fn-name)
   (filter (lambda (t)
 	    (and (check? t)
@@ -67,6 +70,8 @@
 		   (and (pair? test-actual)
 			(or (eqv? (car test-actual) fn-name)
 			    (and (eqv? (car test-actual) 'local)
+                                 (> (length test-actual) 2)
+                                 (pair? (caddr test-actual))
 				 (eqv? (caaddr test-actual) fn-name)))))))
 	  (map elt-sexp (elts))))
 

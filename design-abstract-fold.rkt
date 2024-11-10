@@ -61,7 +61,7 @@ This solves problems about order of arguments.
            [sigs   (htdf-sigs htdf)]
            [tests  (htdf-checks htdf)]
            [totag2 (and (pair? (htdf-template-origins htdf)) (car (htdf-template-origins htdf)))]
-           [defn2  (and (htdf-defns htdf) (last (htdf-defns htdf)))])
+           [defn2  (and (pair? (htdf-defns htdf)) (last (htdf-defns htdf)))])
       (check-design-abstract-fold     fn args sig d1 d2 d3 d4 v3 v4 totag defn sigs tests totag2 defn2))))
   
 (define (check-design-abstract-fold fn args sig d1 d2 d3 d4 v3 v4 totag defn sigs tests totag2 defn2)
@@ -69,7 +69,7 @@ This solves problems about order of arguments.
     
     (if (not (pair? sigs))
         (rubric-item 'signature #f "Abstract function signature")
-        (check-signature-by-constraints (and sigs (car sigs))
+        (check-signature-by-constraints (and (pair? sigs) (car sigs))
                                         (make-constraints-from-signature sig)))
 
     (grade-submitted-tests* 1 0)
