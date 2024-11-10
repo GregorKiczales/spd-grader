@@ -55,14 +55,14 @@
 (define (grade-questions-intact/types* fn-defn types)
   (let* ([fn-name (and (fn-defn? fn-defn) (fn-defn-name fn-defn))]
          [what (format "~a - cond questions intact:" fn-name)])
-    (guard-template-fn-grading fn-name 'template-intact what
+    (guard-template-fn-grading fn-defn 'template-intact what
                                (header what
                                  (check-questions/types types fn-defn)))))
 
 (define (grade-questions-intact/body* fn-defn params body)  
   (let* ([fn-name (and (fn-defn? fn-defn) (caadr fn-defn))]
          [what (format "~a - cond questions intact:" fn-name)])
-    (guard-template-fn-grading fn-name 'template-intact what
+    (guard-template-fn-grading fn-defn 'template-intact what
                                ;; !!! still need to clean this up, should it call check-template/body ?
                                (rubric-item 'template-intact
                                             (and (fn-defn? fn-defn)
