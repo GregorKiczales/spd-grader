@@ -665,24 +665,24 @@
 (module+ test
 
   (define Cat (compound (list Integer Integer) 'make-cat 'cat? '(cat-x cat-y)))
-  
+
   ;; top-level distinct (shouldn't actually happen, but forms a base case for testing)
   (check-equal? (map score-m (check-dd-rules-internal (atomic-d "green")
                                                       '(atomic-distinct)))
                 '(1))
-  
+
   ;; simple atomic-non-distinct
   (check-equal? (map score-m (check-dd-rules-internal Number
                                                       '(atomic-non-distinct)))
                 '(1))
   
-  
+
   ;; String instead of Number
   (check-equal? (map score-m (check-dd-rules-internal String
                                                       '(atomic-non-distinct)))
                 '(1))
   
-  
+
   ;; 2 field compound of atomic non-distinct
   (check-equal? (map score-m (check-dd-rules-internal Cat '(compound)))
                 '(1))
@@ -750,7 +750,7 @@
   
   
   
-  
+
   ;;; ****************
   ;; top-level distinct (shouldn't actually happen, but forms a base case for testing)
   (check-equal? (map score-m (check-template/types-internal (list (atomic-d "green"))
@@ -806,7 +806,7 @@
                 '(1 0))
   
   
-  
+
   
   ;; 2 field compound of atomic non-distinct
   (check-equal? (map score-m (check-template/types-internal (list Cat)
@@ -831,7 +831,7 @@
                                                             '(define (fn-for-cat c)
                                                                (... (cat-x c) (foo 1)))))
                 '(1 1 0))
-  
+
   
   
   
@@ -884,7 +884,8 @@
                                                                (... (cat-x c) (fn-for-foo (cat-foo c))))))
                 '(1 1 1 1))
   
-  
+
+
   (check-equal? (map score-m (check-template/types-internal (list (one-of String Number))
                                                             '(define (fn-for-foo l)
                                                                (cond [(string? l) (... l)]
@@ -922,6 +923,7 @@
                                                                (cond [(string? l) (... l)]
                                                                      [(number? l) (... l)]))))
                 '(1 1 1 1 1 1 1))
+
   
   ;; ListOfNumber
   (check-equal? (map score-m (check-template/types-internal (list ListOfNumber)
