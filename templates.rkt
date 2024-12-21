@@ -186,8 +186,9 @@
 
 
 (define (tails-equal? n lolox)
-  (and (andmap (lambda (lox)
-                 (>= (length lox) n))
+  (or (< (length lolox) 2)
+      (andmap (lambda (lox)
+                (>= (length lox) n))
                lolox)
        (apply equal? (tails n lolox))))
 
