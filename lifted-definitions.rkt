@@ -8,28 +8,32 @@
 
 (define-syntax (grade-lifted-definitions stx)
   (syntax-case stx ()
-    [(_ defn0 call0 defn ...)
-     #'(check-lifted-definitions 'defn0 'call0 '(defn ...))]))
+    [(_ [defn ...] call lifted ...)
+     #'(check-lifted-definitions '(defn ...) 'call '(lifted ...))]))
 
 
-(define (check-lifted-definitions defn0 call0 sol-defns)
+(define (check-lifted-definitions defns call lifted)
   (let* ([sexps (problem-sexps (car (context)))]
-         [sexps (cond [(and (>= (length sexps) 2)
-                            (equal? (car  sexps) defn0)
-                            (equal? (cadr sexps) call0))
-                       (cddr sexps)]
+         [sexps (cond [(and (>= (length sexps) (+ (length defns) 2))
+                            (equal?      (take sexps (length defns))  defns)
+                            (equal? (car (drop sexps (length defns))) call))
+                       (drop sexps (+ (length defns) 1))]
+                      
+                      [(and (>= (length sexps) (+ (length defns) 1))
+                            (equal? (take sexps (length defns)) defns))
+                       (drop sexps (length defns))]
+
                       [(and (>= (length sexps) 2)
-                            (or (equal? (car sexps) defn0)
-                                (equal? (car sexps) call0)))
-                       (cdr sexps)]
+                            (equal? (car sexps) call))
+                       (drop sexps 1)]
                       [else sexps])])
 
     (combine-scores
      (weights* 1.0 '(*)
        (let loop
-           ([sol-defns      sol-defns] ;go through this
-            [sub-defns      sexps]     ;consuming this perhaps out of order
-            [original-names '()])      ;building up this
+           ([sol-defns      lifted]   ;go through this
+            [sub-defns      sexps]    ;consuming this perhaps out of order
+            [original-names '()])     ;building up this
          (if (null? sol-defns)
              '()
              (let* ([sol-defn      (car sol-defns)]
