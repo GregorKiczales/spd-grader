@@ -343,6 +343,7 @@ validity, and test thoroughness results are reported. No grade information is re
   (syntax-case stx (define define-struct)
     [(define (id ...) body) #t]
     [(define id body) #t]
+    [(define-values (id ...) expr) #t]
     [(define-struct id . args) #t]
     [_ #f]))
 
@@ -1077,6 +1078,11 @@ validity, and test thoroughness results are reported. No grade information is re
 
 
 
+(define (grade-recursive [n 1])
+  (let* ([defn    (list-ref (htdf-defns (car (context))) (sub1 n))]
+         [fn-name (cdadr defn)]
+         [rec?    (recursive? defn)])
+    (rubric-item 'template rec? "Must be recursive")))
 
 (define (grade-not-recursive [n 1])
   (let* ([defn    (list-ref (htdf-defns (car (context))) (sub1 n))]
