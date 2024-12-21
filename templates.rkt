@@ -160,43 +160,39 @@
     ;; !!! this mess should be handled with guard-...
     (if (or (false? local-fn-defns) (member #f local-fn-defns))
         (score #f 'template-intact 1 0 '() (list (message #f "accumulator template intact: not graded because template functions renamed")))
-        (let ([local-params
-               (and local-fn-defns
-                    (map (lambda (defn) (cdadr defn)) local-fn-defns))]
-              
-              [a-params
-               (cond [(= min-accs max-accs 1)       "last parameter"]
-                     [(= min-accs max-accs)         (format "last ~a parameters" min-accs)]
-                     [else                          (format "between ~a and ~a last parameters" min-accs max-accs)])]
-              [a-fns
-               (cond [(= (length local-fn-names) 1) "local function"]
-                     [else                          (format "~a local functions" (length local-fn-names))])])
-          
-          (define (ri x)
-            (rubric-item 'template-intact (not (false? x))
-                         "accumulator template intact - ~a of ~a are the same"
-                         a-params a-fns))
+        (let* ([local-params
+                (and local-fn-defns
+                     (map (lambda (defn) (cdadr defn)) local-fn-defns))]
+               
+               [a-params
+                (cond [(= min-accs max-accs 1)       "last parameter"]
+                      [(= min-accs max-accs)         (format "last ~a parameters" min-accs)]
+                      [else                          (format "between ~a and ~a last parameters" min-accs max-accs)])]
+               [a-fns
+                (cond [(= (length local-fn-names) 1) "local function"]
+                      [else                          (format "~a local functions" (length local-fn-names))])]
+
+               [a-msg (format "accumulator template intact - at least ~a of ~a are the same" a-params a-fns)])
           
           (weights (.4 *)
             (rubric-item 'template-intact (pair? local-fn-defns)
                          "accumulator template intact - top-level function definition around local function definition")
-            (let loop
-                ([n max-accs])
-              (cond [(not (pair? local-params))    (ri false)]
-                    [(< n min-accs)                (ri false)]
-                    [(tails-equal? n local-params) (ri n)]
-                    [else
-                     (loop (sub1 n))])))))))
+            (rubric-item 'template-intact
+                         (let loop ([n max-accs])
+                           (cond [(< n min-accs)                #f]
+                                 [(tails-equal? n local-params) #t]
+                                 [else (loop (sub1 n))]))
+                         a-msg))))))
+
 
 (define (tails-equal? n lolox)
+  (and (andmap (lambda (lox) (> (length lox) n)) lolox)
+       (apply equal? (tails n lolox))))
 
-  
-  (define (tail lox) (and (>= (length lox) n) (take-right lox n)))
-  
-  (let ([tail0 (tail (car lolox))])
-    (andmap (lambda (loxn)
-              (equal? (tail loxn) tail0))
-            (rest lolox))))
+(define (tails n lolox)
+  (map (lambda (lox)
+         (and (> (length lox) n) (take-right lox n)))
+       lolox))
 
 (define-syntax (grade-prohibited-calls stx)
   (syntax-case stx ()
