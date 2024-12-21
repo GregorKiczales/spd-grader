@@ -173,7 +173,7 @@
                       [else                          (format "~a local functions" (length local-fn-names))])]
 
                [a-msg (format "accumulator template intact - ~a of ~a are the same" a-params a-fns)])
-          
+
           (weights (.4 *)
             (rubric-item 'template-intact (pair? local-fn-defns)
                          "accumulator template intact - top-level function definition around local function definition")
@@ -187,10 +187,10 @@
 
 (define (tails-equal? n lolox)
   (or (< (length lolox) 2)
-      (andmap (lambda (lox)
-                (>= (length lox) n))
-               lolox)
-       (apply equal? (tails n lolox))))
+      (and (andmap (lambda (lox)
+                     (>= (length lox) n))
+                   lolox)
+           (apply equal? (tails n lolox)))))
 
 (define (tails n lolox)
   (map (lambda (lox)
