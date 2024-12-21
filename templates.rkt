@@ -167,12 +167,12 @@
                [a-params
                 (cond [(= min-accs max-accs 1)       "last parameter"]
                       [(= min-accs max-accs)         (format "last ~a parameters" min-accs)]
-                      [else                          (format "between ~a and ~a last parameters" min-accs max-accs)])]
+                      [else                          (format "at least ~a and up to ~a last parameters" min-accs max-accs)])]
                [a-fns
                 (cond [(= (length local-fn-names) 1) "local function"]
                       [else                          (format "~a local functions" (length local-fn-names))])]
 
-               [a-msg (format "accumulator template intact - at least ~a of ~a are the same" a-params a-fns)])
+               [a-msg (format "accumulator template intact - ~a of ~a are the same" a-params a-fns)])
           
           (weights (.4 *)
             (rubric-item 'template-intact (pair? local-fn-defns)
@@ -186,12 +186,14 @@
 
 
 (define (tails-equal? n lolox)
-  (and (andmap (lambda (lox) (> (length lox) n)) lolox)
+  (and (andmap (lambda (lox)
+                 (>= (length lox) n))
+               lolox)
        (apply equal? (tails n lolox))))
 
 (define (tails n lolox)
   (map (lambda (lox)
-         (and (> (length lox) n) (take-right lox n)))
+         (take-right lox n))
        lolox))
 
 (define-syntax (grade-prohibited-calls stx)
