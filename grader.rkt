@@ -1165,7 +1165,7 @@ validity, and test thoroughness results are reported. No grade information is re
   (let* ([htdf   (car (context))]
          [defns  (and htdf (htdf-defns htdf))]
          [defn   (and (>= (length defns) n) (list-ref defns (sub1 n)))]
-         [local-defns (and defn (filter fn-defn? (cdr (defines defn))))])
+         [local-defns (and defn (fn-defn? defn) (filter fn-defn? (cdr (defines defn))))])
 
     (if (or (not local-defns) (null? local-defns))
 
