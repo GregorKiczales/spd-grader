@@ -102,7 +102,7 @@
      #'(let ([what (format "~a - natural helper~a intact" 'fn-name (if (null? (cdr '(called-fn ...))) "" "s"))])
          (guard-template-fn-grading fn-name 'template-intact what
                                     (rubric-item 'template-intact
-                                                 (calls-all? fn-name '(called-fn ...))
+                                                 (filled-and-calls-all? fn-name '(called-fn ...))
                                                  what)))]))
 
 (define-syntax (grade-try-catch stx)
