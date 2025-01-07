@@ -1054,6 +1054,7 @@ validity, and test thoroughness results are reported. No grade information is re
                             (pluralize sol-ndefns "definition")))
            
            (and (pair? must-use-free)
+                (list? sub-free)
                 (rubric-item 'other
                              (let loop ([sub-free sub-free]
                                         [must-use-free must-use-free])
