@@ -1030,7 +1030,8 @@ validity, and test thoroughness results are reported. No grade information is re
          
          [sub          (problem-sexps problem)]
          [sub-defns    (and (pair? sub) (filter defn? sub))]
-         [sub-expr     (and (pair? sub) (not (defn? (last sub))) (last sub))]
+         [sub-exprs    (and (pair? sub) (filter (compose not defn?) sub))]
+         [sub-expr     (and sub-exprs (= (length sub-exprs) 1) (car sub-exprs))]
 
          [sub-ndefns   (and sub-defns (length sub-defns))]
          [sub-free     (and sub-expr (free sub-expr))]
@@ -1046,7 +1047,7 @@ validity, and test thoroughness results are reported. No grade information is re
                             "Does not comment out, edit or add to the ~a supplied in starter file"
                             (pluralize sol-ndefns "definition")))
            
-           (if sub-expr ;(zero? sol-ndefns)
+           (if (= sol-ndefns 0)
                (rubric-item 'other sub-expr "Has a single top-level expression")
                (rubric-item 'other
                             sub-expr
@@ -1056,6 +1057,8 @@ validity, and test thoroughness results are reported. No grade information is re
            (and (pair? must-use-free)
                 (list? sub-free)
                 (rubric-item 'other
+                             ;; must-use-free can have duplicates to indicate
+                             ;; how many times a constant must be used
                              (let loop ([sub-free sub-free]
                                         [must-use-free must-use-free])
                                (or (empty? must-use-free)
