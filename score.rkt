@@ -294,6 +294,8 @@
     (format " ~a%" (~r (* 100 p) #:precision 1 #:notation 'positional #:min-width 4)))
   
   (let [(internal (walk/s s 1 ""))] ;by side-effect has displayed report
+    (void)
+    #; ;no longer include sexpression form of score, we have not used it once in n years
     (when internal?
       (displayln (format "~%~%~a" INTERNAL-DATA-LINE) out) 
       (pretty-print internal out))))
