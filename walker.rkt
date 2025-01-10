@@ -229,7 +229,7 @@
                  [(value constant null bound #;free) '()]
                  [(if cond and or define local local-define local-body lambda call) (recur)]))))
 
-(define (values f0)
+(define (self-evaluating f0)
   (walk-form (datum->syntax #f f0)
              '()
              (lambda (kind stx e ctx env in-fn-defn recur)
