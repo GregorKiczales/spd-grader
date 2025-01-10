@@ -340,7 +340,7 @@ validity, and test thoroughness results are reported. No grade information is re
 
 
 (define-for-syntax (stx-define? stx)
-  (syntax-case stx (define define-struct)
+  (syntax-case stx (define define-struct define-values)
     [(define (id ...) body) #t]
     [(define id body) #t]
     [(define-values (id ...) expr) #t]
@@ -348,7 +348,7 @@ validity, and test thoroughness results are reported. No grade information is re
     [_ #f]))
 
 (define-for-syntax (stx-not-define? stx)
-  (syntax-case stx (define define-struct)
+  (syntax-case stx (define define-struct define-values)
     [(define (id ...) body) #f]
     [(define id body) #f]
     [(define-struct id . args) #f]
@@ -1016,12 +1016,16 @@ validity, and test thoroughness results are reported. No grade information is re
 ;;
 (define-syntax (grade-top-level-expression stx)
   (syntax-case stx ()
-    [(_ must-use-free defns ... value-expr)
+    [(_ must-use-free * defns ... value-expr)
      #'(recovery-point grade-top-level-expression
 	 (assert-context--@problem)
-         (check-top-level-expression `must-use-free `(defns ...) `value-expr))]))
+         (check-top-level-expression `must-use-free '*              `(defns ...) `value-expr))]
+    [(_ must-use-free may-use-values defns ... value-expr)
+     #'(recovery-point grade-top-level-expression
+	 (assert-context--@problem)
+         (check-top-level-expression `must-use-free `may-use-values `(defns ...) `value-expr))]))
 
-(define (check-top-level-expression must-use-free sol-defns sol-expr)
+(define (check-top-level-expression must-use-free may-use-values sol-defns sol-expr)
   (let* ([problem (car (context))]
          
          [sol-ndefns   (length sol-defns)]
@@ -1035,7 +1039,7 @@ validity, and test thoroughness results are reported. No grade information is re
 
          [sub-ndefns   (and sub-defns (length sub-defns))]
          [sub-free     (and sub-expr (free sub-expr))]
-         [sub-values   (and sub-expr (constants sub-expr))]
+         [sub-values   (and sub-expr (self-evaluating sub-expr))]
 
          [scores
           (list
@@ -1065,7 +1069,13 @@ validity, and test thoroughness results are reported. No grade information is re
                                    (and (memq (car must-use-free) sub-free)
                                         (loop (remove (car must-use-free) sub-free) ;consume 1 use
                                               (cdr must-use-free)))))               ;and consume one requirement
-                             "Expression uses required CONSTANTs"))
+                             "Expression includes required defined CONSTANTs"))
+           (and (not (eqv? may-use-values '*))
+                (rubric-item 'other
+                             (andmap (lambda (v) (member v may-use-values))
+                                     sub-values)
+                             "Expression only includes allowed values"))
+                                
            
            (rubric-item 'eval-etc
                         (and sub-expr (calling-evaluator #f `(equal? ,sub-expr ,sol-expr)))
