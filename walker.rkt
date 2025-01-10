@@ -60,8 +60,9 @@
 ;;    - but not what to recurse on, for that, must call walk-stx
 (define (walk-form stx0 env0 p [combine append])
   (define (walk-stx stx ctx env in-fn)
-    (let ([e (syntax-e stx)])
-      (cond [(value? e)    (p 'value    stx e ctx env in-fn (lambda () e))]
+    (let ([d (syntax->datum stx)]
+          [e (syntax-e stx)])
+      (cond [(value? d)    (p 'value    stx d ctx env in-fn (lambda () d))] ;needs to be datum for lists
             [(constant? e) (p 'constant stx e ctx env in-fn (lambda () e))]
             [(null? e)     (p 'null     stx e ctx env in-fn (lambda () e))] ;!!! does this ever happen?
             [(symbol? e)
@@ -228,6 +229,14 @@
                  [(value constant null bound #;free) '()]
                  [(if cond and or define local local-define local-body lambda call) (recur)]))))
 
+(define (values f0)
+  (walk-form (datum->syntax #f f0)
+             '()
+             (lambda (kind stx e ctx env in-fn-defn recur)
+               (walker-case kind
+                 [(value) (list e)]
+                 [(#;value constant null bound free) '()]
+                 [(if cond and or define local local-define local-body lambda call) (recur)]))))
 
 
 
@@ -548,6 +557,11 @@
   
   (check-equal? (free '(if (foo x) (bar y) (baz z)))
                 '(foo x bar y baz z))
+
+  
+  
+  (check-equal? (values '(if (foo 1) (bar 2) (baz "foo" #t true #f false (cons 1 (cons 2 empty)))))
+                '(1 2 "foo" #t true #f false (cons 1 (cons 2 empty))))
   
   
   (check-equal? (defines '(define x 1)) '((define x 1)))
