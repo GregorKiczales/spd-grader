@@ -618,13 +618,6 @@ validity, and test thoroughness results are reported. No grade information is re
     (check-argument-thoroughness fn-name tests lop aaparam aachecks paparams pachecks)))
 
                                       
-;deprecated
-(define-syntax (grade-tests-argument-thoroughness stx)
-  (syntax-case stx ()
-    [(_ (p ...) check ...)
-     #'(grade-argument-thoroughness () (per-args (p ...) check ...))]))
-
-
 (define-syntax (grade-thoroughness-by-faulty-functions stx)
   (syntax-case stx ()
     [(_ n defn ...) #'(grade-thoroughness-by-faulty-functions* `n (list `defn ...))]))
