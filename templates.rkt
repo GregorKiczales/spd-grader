@@ -186,16 +186,26 @@
 
 
 (define (tails-equal? n lolox)
+  
+  (define (tails n lolox)
+    (map (lambda (lox)
+           (take-right lox n))
+         lolox))
+
+  (define (fn-for-lotail lotail)
+    (cond;[(empty? lotail) #t]
+          [(empty? (rest lotail)) #t]
+          [else
+           (and (equal? (car lotail)
+                        (cadr lotail))
+                (fn-for-lotail (rest lotail)))]))
+  
   (or (< (length lolox) 2)
       (and (andmap (lambda (lox)
                      (>= (length lox) n))
                    lolox)
-           (apply equal? (tails n lolox)))))
+           (fn-for-lotail (tails n lolox)))))
 
-(define (tails n lolox)
-  (map (lambda (lox)
-         (take-right lox n))
-       lolox))
 
 (define-syntax (grade-prohibited-calls stx)
   (syntax-case stx ()
