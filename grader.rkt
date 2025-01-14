@@ -1023,7 +1023,7 @@ validity, and test thoroughness results are reported. No grade information is re
          
          [sol-ndefns   (length sol-defns)]
          [sol-free     (free sol-expr)]
-         [sol-values   (constants sol-expr)] ;!!! rename constant to values or something
+         [sol-values   (self-evaluating sol-expr)]
          
          [sub          (problem-sexps problem)]
          [sub-defns    (and (pair? sub) (filter defn? sub))]
@@ -1065,8 +1065,9 @@ validity, and test thoroughness results are reported. No grade information is re
                              "Expression includes required defined CONSTANTs"))
            (and (not (eqv? may-use-values '*))
                 (rubric-item 'other
-                             (andmap (lambda (v) (member v may-use-values))
-                                     sub-values)
+                             (and (pair? sub-values)
+                                  (andmap (lambda (v) (member v may-use-values))
+                                          sub-values))
                              "Expression only includes allowed values"))
                                 
            
