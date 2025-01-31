@@ -43,8 +43,8 @@
               body])]))
 
 
-(define (grade-questions-intact fn-defn type)
-  (grade-questions-intact/types* fn-defn (list type)))
+(define (grade-questions-intact fn-defn . types)
+  (grade-questions-intact/types* fn-defn types))
 
 (define-syntax (grade-questions-intact/body stx)
   (syntax-case stx ()

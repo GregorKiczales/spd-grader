@@ -173,6 +173,7 @@
 (define (check-nmrs/types      types defn) (check-template-parts/types types defn 'check-nmrs/types      'allow-one-arg 'nmrs))
 
 (define (check-template-parts/types types defn who . options)
+  #;
   (when (> (length types) 1)
     (error* "~a called with more than one type." who))
   (combine-scores (weights* 1.0 '(*)
