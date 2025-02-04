@@ -157,8 +157,11 @@
   (define (walk-define-internal stx e nenv in-fn in-local?)
     (let ([header (syntax->datum (cadr e))])
       (if (pair? header)
-          (walk-fn-body (caddr e) nenv stx)
-          (walk-stx (caddr e) (if in-local? 'other 'tail) nenv stx))))
+          (walk-fn-body (if (pair? (cddr e)) (caddr e) (syntax ""))
+                        nenv
+                        stx)
+          (walk-stx (if (pair? (cddr e)) (caddr e) (syntax ""))
+                    (if in-local? 'other 'tail) nenv stx))))
   
   (define (walk-lambda stx e ctx env in-fn) ; !!! not tested in check-expects
     (p 'lambda stx e ctx env in-fn
