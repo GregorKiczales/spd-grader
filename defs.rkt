@@ -27,6 +27,7 @@
                             submitted-tests additional-tests))
 
 (define            TOPICS '(other
+                            style
                             eval-etc
                             dd-template-rules
                             dd-template
@@ -38,20 +39,24 @@
                             template-intact
                             submitted-tests additional-tests))
 
-(define EARLY-REPORT-TOPICS '(eval-etc starter-intact signature test-validity test-thoroughness))
+(define EARLY-REPORT-TOPICS '(style eval-etc starter-intact signature test-validity test-thoroughness))
 
+
+(define stxs      (make-parameter #f)) ;(listof Syntax) the coming dom for the submission file
+(define elts      (make-parameter #f)) ;(listof Elt)    the old dom for the submission file
+(define lines     (make-parameter #f)) ;(listof String) the raw text of the submission file
 
 ;; these affect production of score
 
 (define evaluator (make-parameter (lambda (x) (error "No sandbox evaluator setup yet."))))
 (define logger    (make-parameter (lambda (x) (error "No grading logger setup yet."))))
-(define elts      (make-parameter #f)) ;(listof Elt) the dom for the submission file
 (define context   (make-parameter #f)) ;(listof tag) tag context stack, ie. ((@htdf foo) (@problem 1))
 
 ;; these affect displaying of score
 
-(define verbose?  (make-parameter #f)) ;produce verbose or concise reports
-(define early?    (make-parameter #f)) ;was this before the resubmit deadline
+(define verbose?     (make-parameter #f)) ;produce verbose or concise reports
+(define early?       (make-parameter #f)) ;was this before the resubmit deadline
+(define show-scores? (make-parameter #f)) ;display X% of Y%
 
 
 (define current-value-printer   (make-parameter #f))
