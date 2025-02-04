@@ -6,7 +6,8 @@
          grade-exam-starters grade-exam-solutions
          grade-spd-starters  grade-spd-solutions
          grade-110-starters  grade-110-solutions   ;!!! factor this 110 stuff out of spd
-         grade-one)
+         grade-one
+         grade-tree SPD-MATERIALS 110-MATERIALS) ;!!! during development of style.rkt
 
 (define SPD-MATERIALS (build-path (find-system-path 'home-dir) "spd-materials"))
 (define 110-MATERIALS (build-path (find-system-path 'home-dir) "110-materials"))
