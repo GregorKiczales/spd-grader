@@ -12,7 +12,9 @@
 
 (provide grade-style
          check-style
-         check-htdf-style)
+         
+         check-style/htdf
+         check-style/file)
 
 
 (struct htdf-design (tag sigs purpose checks stub origins templates fn-defns lines) #:transparent)
@@ -41,11 +43,11 @@
   (header "Style rules:"
     (combine-scores
      (weights* 1.0 '(*)
-       (map check-htdf-style
+       (map check-style/htdf
             (filter (lambda (stx) (@htdf? (syntax->datum stx)))
                     (stxs)))))))
 
-(define (check-htdf-style tag-stx)
+(define (check-style/htdf tag-stx)
   (let ([design (parse-htdf  tag-stx)])
     (header (format "Style rules for ~a:" (syntax->datum tag-stx))
       (weights (*)
@@ -450,7 +452,7 @@
 
 
 
-(define (check-style-in-file p)
+(define (check-style/file p)
   (parameterize ([stxs  #f]
                  [lines #f]
                  [elts  #f])
