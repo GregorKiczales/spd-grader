@@ -124,7 +124,7 @@ NOTE: This problem will be autograded, and ALL OF THE FOLLOWING ARE ESSENTIAL
 (define (check-use-bia-fn fn-name sig max-marks-and-comps supplied additional)
   (assert-context--@htdf)
   (ensuring 
-   (let* ([sexps (map elt-sexp (elts))]
+   (let* ([sexps (sexps)]
           [htdf (car (context))]
           [defns (htdf-defns htdf)]
           [defn  (and (= (length defns) 1) (car defns))])
