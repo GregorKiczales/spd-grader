@@ -5,18 +5,23 @@
 
 (provide (all-defined-out))
 
-(struct elt (tags sexp) #:transparent)
+(struct elt (tags stx sexp) #:transparent)
 
 (define CHECK-FORMS
   '(check-expect check-random check-satisfied check-within check-error check-member-of check-range))
 
 
-(define (sexps)     (map elt-sexp (elts)))
+(define (sexps)     (map elt-sexp (elts))) ;acts like a parameter
 
 (define (get-defns) (htdf-defns (car (context))))
 (define (get-defn)  (let ([defns (get-defns)]) (and (pair? defns) (car defns))))
 
-
+(define (sexp->stx sexp)
+  (let loop ([elts (elts)])
+    (cond [(null? elts) #f]
+          [(equal? (elt-sexp (car elts)) sexp) (elt-stx (car elts))]
+          [else
+           (loop (cdr elts))])))
 
 (define (get-problem* n)
   (or (get-by-pred (lambda (x) (and (@problem? x) (= n (problem-num x)))))
@@ -43,22 +48,22 @@
 	     (raise-student-error "could not find ~a number ~a" kind n))]))
 
 (define (get-by-pred p)
-  (let loop ([sexps (if (null? (context)) (map elt-sexp (elts)) (tag-sexps (car (context))))])
+  (let loop ([sexps (if (null? (context)) (sexps) (tag-sexps (car (context))))])
     (cond [(empty? sexps) #f]
           [(p (car sexps)) (car sexps)]
           [else
            (loop (rest sexps))])))
 
 (define (get-by-index p n)
-  (let loop ([i 0]                        ;!!! below was just (elts)
-	     [sexps (if (null? (context)) (map elt-sexp (elts)) (tag-sexps (car (context))))])
+  (let loop ([i 0]                        
+	     [sexps (if (null? (context)) (sexps) (tag-sexps (car (context))))])
     (cond [(empty? sexps)                 #f]
 	  [(and (p (car sexps)) (= i n))  (car sexps)]
 	  [     (p (car sexps))           (loop (add1 i) (rest sexps))]
 	  [else                           (loop       i  (rest sexps))])))
 
 (define (get-all-tests)
-  (filter check? (map elt-sexp (elts))))
+  (filter check? (sexps)))
 
 ;;
 ;; The new check-expect swallows bad syntax errors, so we can't assume all
@@ -73,46 +78,23 @@
                                  (> (length test-actual) 2)
                                  (pair? (caddr test-actual))
 				 (eqv? (caaddr test-actual) fn-name)))))))
-	  (map elt-sexp (elts))))
-
-
-
-
-
-(define (fn->elts fn)
-  (parse-elts (read-sexps fn)))
-
-(define (read-sexps fn)
-  (call-with-input-file fn
-    (lambda (p)
-      (parameterize ([read-accept-reader #t]
-		     [read-case-sensitive #t]
-                     [read-decimal-as-inexact #f] ;to match teaching languages
-		     [current-input-port p])
-	(read-line (current-input-port))
-	(read-line (current-input-port))
-	(read-line (current-input-port))
-	
-	(let loop ([se (read)])
-	  (if (eof-object? se)
-	      '()
-	      (cons (post-read-convert se) (loop (read)))))))))
+	  (sexps)))
 
 (define (read-syntaxes fn)
-  (call-with-input-file fn
-    (lambda (p)
-      (parameterize ([read-accept-reader #t]
-		     [read-case-sensitive #t]
-                     [read-decimal-as-inexact #f] ;to match teaching languages
-		     [current-input-port p])
+  (with-handlers [(exn:fail? (lambda (e) '()))]
+    (call-with-input-file fn
+      (lambda (p)
+        (parameterize ([read-accept-reader #t]
+                       [read-case-sensitive #t]
+                       [read-decimal-as-inexact #f] ;to match teaching languages
+                       [current-input-port p])
+          (port-count-lines! p) ;line numbers will include 3 hidden lines.
+          
+          (cdr (syntax->list (cadddr (syntax->list (read-syntax fn p))))))))))
 
-        (cdr (syntax->list (cadddr (syntax->list (read-syntax fn p)))))))))
-  
 
 
-
-
-(define (parse-elts lose)
+(define (parse-elts lo-stx lo-line)
   ;;
   ;; The grade-xxx forms enforce a nesting of graders as follows
   ;;  grade-problem (must be at top-level)
@@ -141,25 +123,26 @@
                      (remove-all tags (cdr context))))]))
            
 
-  (let loop ([lose lose]
+  (let loop ([lo-stx lo-stx]
 	     [context '()])
-    (if (null? lose)
+    (if (null? lo-stx)
 	'()
-	(let ([sexp (first lose)])
+	(let* ([stx (car lo-stx)]
+               [sexp (post-read-convert (syntax->datum stx))])
 	  (cond [(and (pair? sexp)
 		      (member (first sexp) '(@problem @htdw @htdd @htdf)))
 		 (let ([new-context (cons sexp (clear-context (first sexp) context))])
-		   (cons (elt (cdr new-context) sexp)
-			 (loop (cdr lose)
+		   (cons (elt (cdr new-context) stx sexp)
+			 (loop (cdr lo-stx)
 			       new-context)))]
                 [(and (pair? sexp)
                       (eqv? (first sexp) '@signature))
-                 (cons (elt context (subst 'false #f sexp)) ;!!! make this go away, false is a symbol in this case not a value
-                       (loop (cdr lose)
+                 (cons (elt context stx (subst 'false #f sexp)) ;!!! make this go away, false is a symbol in this case not a value
+                       (loop (cdr lo-stx)
                              context))]
 		[else
-		 (cons (elt context sexp)
-		       (loop (cdr lose)
+		 (cons (elt context stx sexp)
+		       (loop (cdr lo-stx)
 			     context))])))))
 
 
