@@ -499,15 +499,17 @@
 
 
 
-(define (check-style/file p)
+(define (check-style/file p [only-report-zeroes? #f])
   (parameterize ([stxs  #f]
                  [lines #f]
                  [elts  #f])
     (stxs  (read-syntaxes p))
     (lines (file->lines p))
     (elts  (parse-elts (stxs) (lines)))
-    
-    (display-score (header (format "Style rules for ~a:" p) (check-style)) (current-output-port) #t)))
+
+    (let ([s (header (format "Style rules for ~a:" p) (check-style))])
+      (unless (= (score-m s) 1)
+        (display-score s (current-output-port) #t)))))
 
 
 
