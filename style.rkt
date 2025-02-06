@@ -251,12 +251,13 @@
   (let* ([tag-stx  (htdf-design-tag design)]
          [htdf-sexp (syntax->datum tag-stx)]
          [sigs      (htdf-design-sigs design)]
-         [sig-sexp  (and (pair? sigs) (syntax->datum (last sigs)))]
-         [stub-sexp (and sig-sexp (htdf-design-stub design))]
+         [sig-sexp  (and (pair? sigs) (syntax->datum (last sigs)))]         
+         [stub-sexp (htdf-design-stub design)]
 
          [correct?
-          (and stub-sexp
-               (fn-defn? stub-sexp)
+          (and (@signature? sig-sexp)
+               (fn-defn?    stub-sexp)
+               
                (eqv? (fn-defn-name stub-sexp) (cadr htdf-sexp))
                (= (length (fn-defn-parameters stub-sexp)) (length (signature-args sig-sexp)))
                (pair? (cddr stub-sexp)))])
@@ -264,8 +265,10 @@
     (score #f 'style 1
            (if correct? 1 0)
            '()
-           (list (message #f "Commented out stub:~a"
-                          (if correct? " correct." " incorrect."))))))
+           (cons (message #f "Commented out stub:~a" (if correct? " correct." " incorrect."))
+                 (cond [(not (@signature? sig-sexp))              (list (message #f "No signature found, so could not find stub."))]
+                       [(not (pair? (htdf-design-checks design))) (list (message #f "No tests found, so could not find stub."))]
+                       [else '()])))))
 
 (define (trim-leading-comments-and-combine lines)
   (cond [(null? lines) ""]
