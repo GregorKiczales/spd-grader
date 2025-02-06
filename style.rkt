@@ -158,8 +158,8 @@
          [after-sigs (and (pair? sigs)
                           (next-stx (last sigs)))]
 
-         [purpose    (cond [(and (pair? sigs) after-sigs) (lines-between (last sigs) after-sigs)]
-                           [     (pair? sigs)             (lines-after (last sigs))]
+         [purpose    (cond [after-sigs   (lines-between (last sigs) after-sigs)]
+                           [(pair? sigs) (lines-after (last sigs))]
                            [else '()])]
 
          [checks     (and after-sigs
@@ -169,8 +169,8 @@
          [after-checks (and (pair? checks)
                             (next-stx (last checks)))]
 
-         [stub         (cond [(and (pair? checks) after-checks) (parse-stub (lines-between (last checks) after-checks))]
-                             [     (pair? checks)               (parse-stub (lines-after (last checks)))]
+         [stub         (cond [after-checks   (parse-stub (lines-between (last checks) after-checks))]
+                             [(pair? checks) (parse-stub (lines-after (last checks)))]
                              [else #f])]
 
          [next-section-tag (findf (lambda (stx)
@@ -437,7 +437,6 @@
 |#
 
 
-
 (define (lines-between a-stx b-stx)
   (let* ([a-line-num (syntax-line a-stx)]
          [b-line-num (syntax-line b-stx)]
@@ -445,8 +444,10 @@
          [lines-from-a  (lines-from a-stx)]
          [lines-after-a (lines-after a-stx)])
 
-    (take lines-after-a
-          (- b-line-num a-line-num (- (length lines-from-a) (length lines-after-a))))))
+    (if (= a-line-num b-line-num)
+        '()    
+        (take lines-after-a
+              (- b-line-num a-line-num (- (length lines-from-a) (length lines-after-a)))))))
 
 (define (lines-including a-stx b-stx)
   (let* ([a-line-num (syntax-line a-stx)]
@@ -468,6 +469,7 @@
     (cond [(null? lines) '()]
           [(<= to-skip 0) lines]
           [else
+           ;; !!! this might not be right if the next syntax begins on the same line
            (loop (cdr lines)
                  (- to-skip (string-length (car lines)) 1))])));1 extra for newline
 
