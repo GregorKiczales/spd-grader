@@ -54,13 +54,14 @@
                  [checking-stub?      (memq 'stub options)]
                  [checking-@template? (memq '@template options)]          
                  [checking-local?     (memq 'local options)])
-    
-    (header "Style rules:"
-      (combine-scores
-       (weights* 1.0 '(*)
-         (map check-style/htdf
-              (filter (lambda (stx) (@htdf? (syntax->datum stx)))
-                      (stxs))))))))
+
+    (let ([htdf-tags (filter (lambda (stx) (@htdf? (syntax->datum stx))) (stxs))])
+      (header "Style rules:"
+        (combine-scores
+         (weights* 1.0 '(*)
+           (if (null? htdf-tags)
+               (list (rubric-item 'style 1 "No @htdf tags in file."))
+               (map check-style/htdf htdf-tags))))))))
 
 (define (check-style/htdf tag-stx)
   (let ([design (parse-htdf  tag-stx)])
@@ -118,7 +119,7 @@
                           (cond [(null? bad-lines) " correct."]
                                 [(null? (cdr bad-lines)) " incorrect, 1 is not."]
                                 [else
-                                 (format " incorrect, ~a is not." (length bad-lines))]))
+                                 (format " incorrect, ~a ~a not." (length bad-lines) (is/are bad-lines))]))
                  (map (lambda (bl) 
                         (message #f "  ~a" (cdr bl)))
                       bad-lines)))))
@@ -329,7 +330,8 @@
 
 (define (oxford-comma lo-string/symbol)
   (let ([lo-string (map (lambda (x) (if (string? x) x (symbol->string x))) lo-string/symbol)])
-    (cond [(null? (cdr lo-string)) (format "~a" (car lo-string))]
+    (cond [(null? lo-string) ""]
+          [(null? (cdr lo-string)) (format "~a" (car lo-string))]
           [(null? (cddr lo-string)) (format "~a and ~a" (car lo-string) (cadr lo-string))]
           [else
            (string-join lo-string ", " #:before-last ", and ")])))
@@ -381,7 +383,7 @@
              [seen-lower? #f]
              [seen-upper? #f])
     (cond [(and seen-lower? seen-upper?) #t]
-          [(empty? chars) #f]
+          [(null? chars) #f]
           [else
            (loop (cdr chars)
                  (or seen-lower? (char-lower-case? (car chars)))
@@ -492,7 +494,6 @@
     (lines (file->lines p))
     (elts  (parse-elts (stxs) (lines)))
     
-    (displayln "--------")
     (display-score (header (format "Style rules for ~a:" p) (check-style)) (current-output-port) #t)))
 
 
