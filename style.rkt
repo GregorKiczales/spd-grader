@@ -18,9 +18,9 @@
 
 
 
-(define (setup)
-  (lines (file->lines   "mt1-p5-solution.rkt"))
-  [stxs  (read-syntaxes "mt1-p5-solution.rkt")]
+(define (setup p)
+  (lines (file->lines   p))
+  [stxs  (read-syntaxes p)]
   (elts (parse-elts (stxs) (lines))))
 
 
@@ -194,8 +194,9 @@
                                (takef in-list (lambda (stx) (not (eqv? stx next-section-tag))))
                                in-list)]
 
-         [lines            (and (pair? fn-defns)
-                                (lines-including tag-stx (last fn-defns)))])
+         [lines            (cond [(pair? fn-defns) (lines-including tag-stx (last fn-defns))]
+                                 [(pair? to-end)   (lines-including tag-stx (last to-end))]
+                                 [(pair? in-list)  (lines-including tag-stx (last in-list))])])
 
     (htdf-design tag-stx sigs purpose checks stub origins templates fn-defns stxs lines)))
 
@@ -249,8 +250,9 @@
 (define (check-stub design)  
   (let* ([tag-stx  (htdf-design-tag design)]
          [htdf-sexp (syntax->datum tag-stx)]
-         [sig-sexp  (syntax->datum (last (htdf-design-sigs design)))]
-         [stub-sexp (htdf-design-stub design)]
+         [sigs      (htdf-design-sigs design)]
+         [sig-sexp  (and (pair? sigs) (syntax->datum (last sigs)))]
+         [stub-sexp (and sig-sexp (htdf-design-stub design))]
 
          [correct?
           (and stub-sexp
