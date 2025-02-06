@@ -244,7 +244,7 @@
            (cons (message #f "Purpose properly formatted:~a" (if correct? " correct." " incorrect."))
                  (cond [(not (pair? sigs))   (list (message #f "No signature found, so could not find purpose."))]
                        [(null? 2-semi-lines) (list (message #f "No two semi-colon-space comment lines found after signature."))]
-                       [(not (null? (cdr 2-semi-lines))) (list (message #f "Possible multi-line purpose found."))]
+                       [(not correct?)       (map (lambda (l) (message #f l)) lines)]
                        [else '()])))))
 
 (define (check-stub design)  
