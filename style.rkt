@@ -292,24 +292,30 @@
     (define (check-local-var-name! id) (unless (param-name-ok?    id) (set-add! bad-local-var-names id)))
 
     (for ([stx stxs])
-      (walk-form stx
-                 '()
-                 (lambda (kind stx e ctx env in-fn-defn recur)
-                   (walker-case kind
-                                [(value constant null bound free) '()]
-                                [(if cond and or #;define local #;local-define local-body lambda call) (recur)]
-                                [(define local-define)                               
-                                 (let ([cadr-defn (syntax->datum (cadr e))])
-                                   (cond [(pair? cadr-defn)
-                                          (check-fn-name! (car cadr-defn))
-                                          (map check-param-name! (cdr cadr-defn))
-                                          (recur)]
-                                         [(eqv? kind 'define)
-                                          (check-constant-name! cadr-defn)
-                                          (recur)]
-                                         [(eqv? kind 'local-define)
-                                          (check-local-var-name! cadr-defn)
-                                          (recur)]))]))))
+      ;;
+      ;; Normally we know that code that gets walked is syntactically correct,
+      ;; because it has been check-syntaxed. But here we are going to end up
+      ;; walking inside of @templates, which are unchecked.
+      ;;
+      (with-handlers ([exn:fail? (lambda (e) (void))])
+        (walk-form stx
+                   '()
+                   (lambda (kind stx e ctx env in-fn-defn recur)
+                     (walker-case kind
+                                  [(value constant null bound free) '()]
+                                  [(if cond and or #;define local #;local-define local-body lambda call) (recur)]
+                                  [(define local-define)                               
+                                   (let ([cadr-defn (syntax->datum (cadr e))])
+                                     (cond [(pair? cadr-defn)
+                                            (check-fn-name! (car cadr-defn))
+                                            (map check-param-name! (cdr cadr-defn))
+                                            (recur)]
+                                           [(eqv? kind 'define)
+                                            (check-constant-name! cadr-defn)
+                                            (recur)]
+                                           [(eqv? kind 'local-define)
+                                            (check-local-var-name! cadr-defn)
+                                            (recur)]))])))))
 
     (let ([what (format "~a names"
                         (oxford-comma (reverse (cons-if (checking-local?) "local variable"
