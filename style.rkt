@@ -17,13 +17,11 @@
          check-style/file)
 
 
-(struct htdf-design (tag sigs purpose checks stub origins templates fn-defns lines) #:transparent)
-;;
-;; All fields are (listof stx) except
-;;  tag  is stx
-;;  purpose, stub and lines are (listof string)
-;;
 
+(define (setup)
+  (lines (file->lines   "mt1-p5-solution.rkt"))
+  [stxs  (read-syntaxes "mt1-p5-solution.rkt")]
+  (elts (parse-elts (stxs) (lines))))
 
 
 
@@ -36,25 +34,42 @@
 ;; function and parameter names in lower-caravan-case
 ;;
 
-(define (grade-style)
-  (check-style))
+(define-syntax (grade-style stx)
+  (syntax-case stx ()
+    [(_ option ...)
+     #'(check-style 'option ...)]))
 
-(define (check-style)
-  (header "Style rules:"
-    (combine-scores
-     (weights* 1.0 '(*)
-       (map check-style/htdf
-            (filter (lambda (stx) (@htdf? (syntax->datum stx)))
-                    (stxs)))))))
+(define checking-struct?             (make-parameter #f))
+(define checking-stub?               (make-parameter #f))
+(define checking-@template?          (make-parameter #f))
+(define checking-local?              (make-parameter #f))
+
+(define (check-style . options)              
+
+  (for ([option options])
+    (unless (member option '(structs stub @template local))
+      (error 'check-style "~a is not a legal option for grade-style or check-style." option)))
+  
+  (parameterize ([checking-struct?    (memq 'structs options)]
+                 [checking-stub?      (memq 'stub options)]
+                 [checking-@template? (memq '@template options)]          
+                 [checking-local?     (memq 'local options)])
+    
+    (header "Style rules:"
+      (combine-scores
+       (weights* 1.0 '(*)
+         (map check-style/htdf
+              (filter (lambda (stx) (@htdf? (syntax->datum stx)))
+                      (stxs))))))))
 
 (define (check-style/htdf tag-stx)
   (let ([design (parse-htdf  tag-stx)])
     (header (format "Style rules for ~a:" (syntax->datum tag-stx))
       (weights (*)
         (check-2-semi-comments (htdf-design-lines design))
-        (check-purpose tag-stx)
-        (check-stub    tag-stx)
-        (check-names   tag-stx)))))
+        (check-purpose design)
+        (check-stub    design)
+        (check-names   (htdf-design-stxs design))))))
 
 ;;
 ;; @htdd
@@ -109,17 +124,30 @@
                       bad-lines)))))
 
 
-
-;; Looks for design elements to be in order (in place). Will deliberately
-;; miss elements that are out of place.
+;;
+;; Expects design elements to be in order (in place). Doesn't fail if things
+;; are out of place, but once a stx element is out of place everything from
+;; it to the end will be #f
 ;;
 ;; (@htdf foo)
-;; (@signature
+;; (@signature ..)
 ;; <purpose line(s)>
 ;;
 ;; <checks>
 ;;
+;; ;(define  ;stub
+;;
 ;; <allows origins, templates, and definitions to be grouped or ungrouped>
+
+(struct htdf-design (tag sigs purpose checks stub origins templates fn-defns stxs lines) #:transparent)
+;;
+;; All fields are (listof stx) except
+;;  tag  is stx
+;;  purpose and lines are (listof string)
+;;  stub is sexp
+;; Any field other than tag can be #f
+;;
+
 (define (parse-htdf tag-stx)  
   (let* ([tag-sexp   (syntax->datum tag-stx)]
          [in-list    (member tag-stx (stxs))]
@@ -140,9 +168,9 @@
          [after-checks (and (pair? checks)
                             (next-stx (last checks)))]
 
-         [stub         (cond [(and (pair? checks) after-checks) (lines-between (last checks) after-checks)]
-                             [     (pair? checks)               (lines-after (last checks))]
-                             [else '()])]
+         [stub         (cond [(and (pair? checks) after-checks) (parse-stub (lines-between (last checks) after-checks))]
+                             [     (pair? checks)               (parse-stub (lines-after (last checks)))]
+                             [else #f])]
 
          [next-section-tag (findf (lambda (stx)
                                     (let ([sexp (syntax->datum stx)])
@@ -157,28 +185,43 @@
                                            (lambda (stx) (not (eqv? stx next-section-tag))))
                                     (cdr (member (last checks) (stxs)))))]
          
-         [origins          (and to-end
-                                (filter (compose @template? syntax->datum) to-end))]
-         
-         [templates        (and to-end
-                                (filter (compose @template? syntax->datum) to-end))]
-         
-         [fn-defns         (and to-end
-                                (filter (compose fn-defn?   syntax->datum) to-end))]
+         [origins          (and to-end (filter (compose @template-origin? syntax->datum) to-end))]         
+         [templates        (and to-end (filter (compose @template?        syntax->datum) to-end))]         
+         [fn-defns         (and to-end (filter (compose fn-defn?          syntax->datum) to-end))]
+
+         [stxs             (if next-section-tag
+                               (takef in-list (lambda (stx) (not (eqv? stx next-section-tag))))
+                               in-list)]
 
          [lines            (and (pair? fn-defns)
                                 (lines-including tag-stx (last fn-defns)))])
 
-    (htdf-design tag-stx sigs purpose checks stub origins templates fn-defns lines)))
+    (htdf-design tag-stx sigs purpose checks stub origins templates fn-defns stxs lines)))
 
 
+#|
+
+#;
+(define (foo x y)
+  MTS)
+
+;(define (foo x y) MTS)
+
+|#
+(define (parse-stub lines)
+  (cond [(null? lines) #f]
+        [else
+         (if (or (regexp-match? #rx"^;\\(define" (car lines))
+                 (regexp-match? #rx"^#;" (car lines)))
+             (with-handlers ([exn:fail? (lambda (e) #f)])
+               (call-with-input-string (trim-leading-comments-and-combine lines)
+                                       read))
+             (parse-stub (cdr lines)))]))
 
 
 ;; check a specific @htdf in the current file
-(define (check-purpose tag-stx)
-  (let* ([tag-sexp (syntax->datum tag-stx)]
-         [design (parse-htdf tag-stx)]
-         [sigs   (htdf-design-sigs design)]
+(define (check-purpose design)
+  (let* ([sigs   (htdf-design-sigs design)]
          [lines  (htdf-design-purpose design)]
 
          [2-semi-lines
@@ -202,24 +245,15 @@
                        [(not (null? (cdr 2-semi-lines))) (list (message #f "Possible multi-line purpose found."))]
                        [else '()])))))
 
-(define (check-stub tag-stx)  
-  (let* ([htdf-sexp  (syntax->datum tag-stx)]
-         [design     (parse-htdf tag-stx)]
-         [sig-sexp   (syntax->datum (last (htdf-design-sigs design)))]
-         [stub-lines (htdf-design-stub design)]
-         #|
-
-         #;
-         (define (foo x y)
-            MTS)
-
-         ;(define (foo x y) MTS)
-
-         |#
-         [stub-sexp (find-stub stub-lines)]
+(define (check-stub design)  
+  (let* ([tag-stx  (htdf-design-tag design)]
+         [htdf-sexp (syntax->datum tag-stx)]
+         [sig-sexp  (syntax->datum (last (htdf-design-sigs design)))]
+         [stub-sexp (htdf-design-stub design)]
 
          [correct?
-          (and (fn-defn? stub-sexp)
+          (and stub-sexp
+               (fn-defn? stub-sexp)
                (eqv? (fn-defn-name stub-sexp) (cadr htdf-sexp))
                (= (length (fn-defn-parameters stub-sexp)) (length (signature-args sig-sexp)))
                (pair? (cddr stub-sexp)))])
@@ -229,16 +263,6 @@
            '()
            (list (message #f "Commented out stub:~a"
                           (if correct? " correct." " incorrect."))))))
-
-(define (find-stub lines)
-  (cond [(null? lines) #f]
-        [else
-         (if (or (regexp-match? #rx"^;\\(define" (car lines))
-                 (regexp-match? #rx"^#;" (car lines)))
-             (with-handlers ([exn:fail? (lambda (e) #f)])
-               (call-with-input-string (trim-leading-comments-and-combine lines)
-                                       read))
-             (find-stub (cdr lines)))]))
 
 (define (trim-leading-comments-and-combine lines)
   (cond [(null? lines) ""]
@@ -250,7 +274,7 @@
                
 
 
-(define (check-names stx)
+(define (check-names stxs)
   (let ([bad-fn-names        (mutable-set)]
         [bad-param-names     (mutable-set)]
         [bad-constant-names  (mutable-set)]
@@ -261,46 +285,54 @@
     (define (check-constant-name!  id) (unless (constant-name-ok? id) (set-add! bad-constant-names id)))
     (define (check-local-var-name! id) (unless (param-name-ok?    id) (set-add! bad-local-var-names id)))
 
-    (walk-form stx
-               '()
-               (lambda (kind stx e ctx env in-fn-defn recur)
-                 (walker-case kind
-                              [(value constant null bound free) '()]
-                              [(if cond and or #;define local #;local-define local-body lambda call) (recur)]
-                              [(define local-define)
-                               (let ([cadr-defn (syntax->datum (cadr e))])
-                                 (cond [(pair? cadr-defn)
-                                        (check-fn-name! (car cadr-defn))
-                                        (map check-param-name! (cdr cadr-defn))
-                                        (recur)]
-                                       [(eqv? kind 'define)
-                                        (check-constant-name! cadr-defn)
-                                        (recur)]
-                                       [(eqv? kind 'local-define)
-                                        (check-local-var-name! cadr-defn)
-                                        (recur)]))])))
+    (for ([stx stxs])
+      (walk-form stx
+                 '()
+                 (lambda (kind stx e ctx env in-fn-defn recur)
+                   (walker-case kind
+                                [(value constant null bound free) '()]
+                                [(if cond and or #;define local #;local-define local-body lambda call) (recur)]
+                                [(define local-define)                               
+                                 (let ([cadr-defn (syntax->datum (cadr e))])
+                                   (cond [(pair? cadr-defn)
+                                          (check-fn-name! (car cadr-defn))
+                                          (map check-param-name! (cdr cadr-defn))
+                                          (recur)]
+                                         [(eqv? kind 'define)
+                                          (check-constant-name! cadr-defn)
+                                          (recur)]
+                                         [(eqv? kind 'local-define)
+                                          (check-local-var-name! cadr-defn)
+                                          (recur)]))]))))
 
-    (header "Naming:"
-      (score #f 'style 1
-             (if (and (set-empty? bad-fn-names) (set-empty? bad-param-names) (set-empty? bad-constant-names) (set-empty? bad-local-var-names)) 1 0)
-             '()
-             (remove* '(#t) 
-                      (list (or (set-empty? bad-fn-names)        (name-is/are-bad-style "Function"  bad-fn-names))
-                            (or (set-empty? bad-param-names)     (name-is/are-bad-style "Parameter" bad-param-names))
-                            (or (set-empty? bad-constant-names)  (name-is/are-bad-style "Constant"  bad-constant-names))
-                            (or (set-empty? bad-local-var-names) (name-is/are-bad-style "Constant"  bad-local-var-names))))))))
+    (let ([what (format "~a names"
+                        (oxford-comma (reverse (cons-if (checking-local?) "local variable"
+                                                        (cons-if (checking-struct?) "structure"
+                                                                 (reverse '("Function" "parameter" "constant")))))))])
+      
+
+      (if (and (set-empty? bad-fn-names) (set-empty? bad-param-names) (set-empty? bad-constant-names) (set-empty? bad-local-var-names))
+          (rubric-item 'style 1 what)
+          (score #f 'style 1 0
+                 '()
+                 (remove* '(#t) 
+                          (list (message #f (format "~a: incorrect." what))
+                                (or (set-empty? bad-fn-names)        (name-is/are-bad-style "Function"  bad-fn-names))
+                                (or (set-empty? bad-param-names)     (name-is/are-bad-style "Parameter" bad-param-names))
+                                (or (set-empty? bad-constant-names)  (name-is/are-bad-style "Constant"  bad-constant-names))
+                                (or (set-empty? bad-local-var-names) (name-is/are-bad-style "Constant"  bad-local-var-names)))))))))
 
 (define (name-is/are-bad-style what which)
   (let ([lst (set->list which)])
     (message #f "~a name~a ~a bad style: ~a." what (plural lst) (is/are lst) (oxford-comma lst))))
 
 
-(define (oxford-comma lo-symbol)
-  (let ([lo-string (map symbol->string lo-symbol)])
+(define (oxford-comma lo-string/symbol)
+  (let ([lo-string (map (lambda (x) (if (string? x) x (symbol->string x))) lo-string/symbol)])
     (cond [(null? (cdr lo-string)) (format "~a" (car lo-string))]
           [(null? (cddr lo-string)) (format "~a and ~a" (car lo-string) (cadr lo-string))]
           [else
-           (string-join lo-string ", " #:before-last " and ")])))
+           (string-join lo-string ", " #:before-last ", and ")])))
     
 
 
@@ -456,10 +488,10 @@
   (parameterize ([stxs  #f]
                  [lines #f]
                  [elts  #f])
-
     (stxs  (read-syntaxes p))
     (lines (file->lines p))
     (elts  (parse-elts (stxs) (lines)))
+    
     (displayln "--------")
     (display-score (header (format "Style rules for ~a:" p) (check-style)) (current-output-port) #t)))
 
