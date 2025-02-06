@@ -236,7 +236,7 @@
                    (regexp-match? #rx"^;; CONSTRAINT:" (cadr 2-semi-lines))
                    (regexp-match? #rx"^;; !!!" (cadr 2-semi-lines))
                    (regexp-match? #rx"^;; (N|n)o tests for" (cadr 2-semi-lines))))])
-
+ 
     (score #f 'style 1
            (if correct? 1 0)
            '()
