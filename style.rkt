@@ -10,16 +10,9 @@
 (provide grade-style
          grade-style*
          check-style
+         include-correct-htdf-style-scores?
          
          check-style/htdf)
-
-
-
-(define (setup p)
-  (lines (file->lines   p))
-  [stxs  (read-syntaxes p)]
-  (elts (parse-elts (stxs) (lines))))
-
 
 
 ;;
@@ -42,10 +35,12 @@
                        (rubric-item 'style #f "System error checking style")))])
     (check-style options)))
 
-(define checking-struct?             (make-parameter #f))
-(define checking-stub?               (make-parameter #f))
-(define checking-@template?          (make-parameter #f))
-(define checking-local?              (make-parameter #f))
+(define checking-struct?              (make-parameter #f))
+(define checking-stub?                (make-parameter #f))
+(define checking-@template?           (make-parameter #f))
+(define checking-local?               (make-parameter #f))
+
+(define include-correct-htdf-style-scores? (make-parameter #f))
 
 (define (check-style options)
   (for ([option options])
@@ -57,12 +52,19 @@
                  [checking-@template? (memq '@template options)]          
                  [checking-local?     (memq 'local options)])
 
-    (let ([htdf-tags (filter (lambda (stx) (@htdf? (syntax->datum stx))) (stxs))])
       (combine-scores
        (weights* 1.0 '(*)
-         (if (null? htdf-tags)
-             (list (rubric-item 'style 1 "No @htdf tags in file."))
-             (map check-style/htdf htdf-tags)))))))
+         (let* ([htdf-tags (filter (lambda (stx) (let ([e (syntax-e stx)]) (and (pair? e) (eq? (syntax-e (car e)) '@htdf)))) (stxs))]
+                [scores    (map check-style/htdf htdf-tags)]
+                [scores-to-report
+                 (filter (lambda (s)
+                           (or (include-correct-htdf-style-scores?)
+                               (not (= (score-m s) 1))))
+                         scores)])
+           (cond [(null? scores)           (list (rubric-item 'style #t "Style checking correct by default since no @htdf tags in file"))]
+                 [(null? scores-to-report) (list (rubric-item 'style #t "Style checking"))]
+                 [else scores-to-report]))))))
+               
 
 (define (check-style/htdf tag-stx)
   (let ([design (parse-htdf  tag-stx)])
@@ -72,7 +74,7 @@
          (remove* '(#f)
                   (list (check-2-semi-comments (htdf-design-lines design))
                         (check-purpose design)
-                        (and (checking-stub?) (check-stub    design))
+                        (and (checking-stub?) (check-stub design))
                         (check-names   (htdf-design-stxs design)))))))))
 
 ;;
@@ -297,7 +299,7 @@
     (for ([stx stxs])
       (unless (let ([e (syntax-e stx)])
                 (and (pair? e)
-                     (eq? (car e) '@template)
+                     (eq? (syntax-e (car e)) '@template)
                      (not (checking-@template?))))
         (walk-form stx
                    '()
