@@ -110,15 +110,15 @@
        #`(weights #,(map car es)
            #,@(map cadr es)))]))
 
-(define (weights* left low los)
-  (let loop ([left left] [low low] [los (filter (lambda (x) (or (score? x) (reduction? x))) los)])
+(define (weights* left low0 los0)
+  (let loop ([left left] [low low0] [los (filter (lambda (x) (or (score? x) (reduction? x))) los0)])
     (cond [(and (not (null? los))
                 (reduction? (car los)))
            (cons (car los)
                  (loop left low (cdr los)))]
           [(and (null? low) (null? los)) '()]
-          [(null? low) (error 'weights/weights* "More scores than weights and weights does not end with *.")]
-          [(null? los) (error 'weights/weights* "More weights than scores.")]
+          [(null? low) (error 'weights/weights* "More scores than weights and weights does not end with *, weights are ~a with ~a scores." low0 (length los0))]
+          [(null? los) (error 'weights/weights* "More weights than scores, weights are ~a with ~a scores." low0 (length los0))]
           [(eqv? (car low) '*) (map (curry weight (/ left (length los))) los)]
           [else
            (cons (weight (car low) (car los))
