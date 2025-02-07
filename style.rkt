@@ -292,15 +292,16 @@
     (define (check-local-var-name! id) (unless (param-name-ok?    id) (set-add! bad-local-var-names id)))
 
     (for ([stx stxs])
-      ;;
-      ;; Normally we know that code that gets walked is syntactically correct,
-      ;; because it has been check-syntaxed. But here we are going to end up
-      ;; walking inside of @templates, which are unchecked.
-      ;;
-      (with-handlers ([exn:fail? (lambda (e) (void))])
-        (walk-form stx
-                   '()
-                   (lambda (kind stx e ctx env in-fn-defn recur)
+      (walk-form stx
+                 '()
+                 (lambda (kind stx e ctx env in-fn-defn recur)
+                   ;;
+                   ;; Normally we know that code that gets walked is syntactically correct,
+                   ;; because it has been check-syntaxed. But here we are going to end up
+                   ;; walking inside of @templates, which are unchecked.
+                   ;;
+                   (with-handlers ([exn:fail? (lambda (e) (void))])
+                     
                      (walker-case kind
                                   [(value constant null bound free) '()]
                                   [(if cond and or #;define local #;local-define local-body lambda call) (recur)]
@@ -436,6 +437,40 @@
 ))
 |#
 
+#|
+
+There are a couple of funny things that can happen in terms of finding text after and
+between two top-level syntax:
+
+One is end-of-line comments. So for example, in
+
+(@signature ...) ;useful comment
+;; this is the purpose
+
+we need to start looking for the purpose at the second line, not at ;useful comment
+
+Another is dangling top-level syntax elements. So for example:
+
+(check-expect (...) (...)) e
+(check-expect (...) (...))
+
+This second is a design rule error, so we don't worry about it confusing us.
+
+The basic strategy is that
+
+lines-from
+  will generate a synthetic line in the odd case where it is called
+  with with a top-level syntax element that doesn't begin at the
+  beginning of a line
+
+lines-after
+  produces a result that always starts on the complete line after the
+  last line of the top level syntax element
+
+
+|#
+
+
 
 (define (lines-between a-stx b-stx)
   (let* ([a-line-num (syntax-line a-stx)]
@@ -461,21 +496,29 @@
   
 
 (define (lines-from stx)
-  (drop (lines) (sub1 (syntax-line stx))))
+  (let ([lines (drop (lines) (sub1 (syntax-line stx)))]
+        [col   (syntax-column stx)])
+    (if (zero? col)
+        lines
+        (cons (substring (car lines) col) (cdr lines)))))
 
 (define (lines-after stx)
   (let loop ([lines (lines-from stx)]
              [to-skip (syntax-span stx)])
-    (cond [(null? lines) '()]
-          [(<= to-skip 0) lines]
-          [else
-           ;; !!! this might not be right if the next syntax begins on the same line
-           (loop (cdr lines)
-                 (- to-skip (string-length (car lines)) 1))])));1 extra for newline
+    (if (null? lines)
+        '()
+        (let ([line (car lines)])
+          (cond [(< to-skip 0) (error 'lines-after "to-skip is less than zero")]
+                [(= to-skip 0) lines]
+                [(<= to-skip (string-length line)) (cdr lines)]  ;see note above, we do not make
+                ;;                                               ;synthetic (substring line to-skip)
+                [else
+                 (loop (cdr lines)
+                       (- to-skip (string-length line) 1))])))))
 
 (define (next-stx stx)
   (let ([mem (member stx (stxs))])
-    (and (> (length mem) 1) (cadr mem))))
+    (and (pair? (cdr mem)) (cadr mem))))
 
 
 
@@ -490,7 +533,9 @@
 (define (in-spd-starters  fn) (check-in fn SPD-MATERIALS #rx".*-starter.rkt"))
 (define (in-spd-solutions fn) (check-in fn SPD-MATERIALS #rx".*-solution.rkt"))
 
-(define (check-in fn root regexp) (map fn (filter not-wxme-file? (find root regexp))))
+(define (check-in fn root regexp) (for ([p (find root regexp)])
+                                    (when (not-wxme-file? p)
+                                      (fn p))))
 
 (define (not-wxme-file? p)
   (call-with-input-file* p
@@ -508,7 +553,8 @@
     (elts  (parse-elts (stxs) (lines)))
 
     (let ([s (header (format "Style rules for ~a:" p) (check-style))])
-      (unless (= (score-m s) 1)
+      (when (or (not only-report-zeroes?)
+                (not (= (score-m s) 1)))
         (display-score s (current-output-port) #t)))))
 
 
