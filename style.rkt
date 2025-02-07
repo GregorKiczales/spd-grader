@@ -5,16 +5,13 @@
          spd-grader/utils
          spd-grader/walker
          spd-grader/score
-         spd-grader/file-structure
-         spd-grader/harness
-        ;spd-grader/wordlist
-         )
+         spd-grader/file-structure)
 
 (provide grade-style
+         grade-style*
          check-style
          
-         check-style/htdf
-         check-style/file)
+         check-style/htdf)
 
 
 
@@ -36,41 +33,47 @@
 
 (define-syntax (grade-style stx)
   (syntax-case stx ()
-    [(_ option ...)
-     #'(check-style 'option ...)]))
+    [(_ option ...) #'(grade-style* 'option ...)]))
+
+(define (grade-style* . options)
+  (with-handlers ([exn:fail?
+                   (lambda (e)
+                     (weights (*)
+                       (rubric-item 'style #f "System error checking style")))])
+    (check-style options)))
 
 (define checking-struct?             (make-parameter #f))
 (define checking-stub?               (make-parameter #f))
 (define checking-@template?          (make-parameter #f))
 (define checking-local?              (make-parameter #f))
 
-(define (check-style . options)              
-
+(define (check-style options)
   (for ([option options])
-    (unless (member option '(structs stub @template local))
+    (unless (member option '(struct stub @template local))
       (error 'check-style "~a is not a legal option for grade-style or check-style." option)))
   
-  (parameterize ([checking-struct?    (memq 'structs options)]
+  (parameterize ([checking-struct?    (memq 'struct options)]
                  [checking-stub?      (memq 'stub options)]
                  [checking-@template? (memq '@template options)]          
                  [checking-local?     (memq 'local options)])
 
     (let ([htdf-tags (filter (lambda (stx) (@htdf? (syntax->datum stx))) (stxs))])
-      (header "Style rules:"
-        (combine-scores
-         (weights* 1.0 '(*)
-           (if (null? htdf-tags)
-               (list (rubric-item 'style 1 "No @htdf tags in file."))
-               (map check-style/htdf htdf-tags))))))))
+      (combine-scores
+       (weights* 1.0 '(*)
+         (if (null? htdf-tags)
+             (list (rubric-item 'style 1 "No @htdf tags in file."))
+             (map check-style/htdf htdf-tags)))))))
 
 (define (check-style/htdf tag-stx)
   (let ([design (parse-htdf  tag-stx)])
     (header (format "Style rules for ~a:" (syntax->datum tag-stx))
-      (weights (*)
-        (check-2-semi-comments (htdf-design-lines design))
-        (check-purpose design)
-        (check-stub    design)
-        (check-names   (htdf-design-stxs design))))))
+      (combine-scores
+       (weights* 1.0 '(*)
+         (remove* '(#f)
+                  (list (check-2-semi-comments (htdf-design-lines design))
+                        (check-purpose design)
+                        (and (checking-stub?) (check-stub    design))
+                        (check-names   (htdf-design-stxs design)))))))))
 
 ;;
 ;; @htdd
@@ -292,31 +295,35 @@
     (define (check-local-var-name! id) (unless (param-name-ok?    id) (set-add! bad-local-var-names id)))
 
     (for ([stx stxs])
-      (walk-form stx
-                 '()
-                 (lambda (kind stx e ctx env in-fn-defn recur)
-                   ;;
-                   ;; Normally we know that code that gets walked is syntactically correct,
-                   ;; because it has been check-syntaxed. But here we are going to end up
-                   ;; walking inside of @templates, which are unchecked.
-                   ;;
-                   (with-handlers ([exn:fail? (lambda (e) (void))])
-                     
-                     (walker-case kind
-                                  [(value constant null bound free) '()]
-                                  [(if cond and or #;define local #;local-define local-body lambda call) (recur)]
-                                  [(define local-define)                               
-                                   (let ([cadr-defn (syntax->datum (cadr e))])
-                                     (cond [(pair? cadr-defn)
-                                            (check-fn-name! (car cadr-defn))
-                                            (map check-param-name! (cdr cadr-defn))
-                                            (recur)]
-                                           [(eqv? kind 'define)
-                                            (check-constant-name! cadr-defn)
-                                            (recur)]
-                                           [(eqv? kind 'local-define)
-                                            (check-local-var-name! cadr-defn)
-                                            (recur)]))])))))
+      (unless (let ([e (syntax-e stx)])
+                (and (pair? e)
+                     (eq? (car e) '@template)
+                     (not (checking-@template?))))
+        (walk-form stx
+                   '()
+                   (lambda (kind stx e ctx env in-fn-defn recur)
+                     ;;
+                     ;; Normally we know that code that gets walked is syntactically correct,
+                     ;; because it has been check-syntaxed. But here we are going to end up
+                     ;; walking inside of @templates, which are unchecked.
+                     ;;
+                     (with-handlers ([exn:fail? (lambda (e) (void))])
+                       
+                       (walker-case kind
+                                    [(value constant null bound free) '()]
+                                    [(if cond and or #;define local #;local-define local-body lambda call) (recur)]
+                                    [(define local-define)                               
+                                     (let ([cadr-defn (syntax->datum (cadr e))])
+                                       (cond [(pair? cadr-defn)
+                                              (check-fn-name! (car cadr-defn))
+                                              (map check-param-name! (cdr cadr-defn))
+                                              (recur)]
+                                             [(eqv? kind 'define)
+                                              (check-constant-name! cadr-defn)
+                                              (recur)]
+                                             [(eqv? kind 'local-define)
+                                              (check-local-var-name! cadr-defn)
+                                              (recur)]))]))))))
 
     (let ([what (format "~a names"
                         (oxford-comma (reverse (cons-if (checking-local?) "local variable"
@@ -522,54 +529,5 @@ lines-after
 
 
 
-;; !!! for development
-
-
-(define (in-110-materials fn) (check-in fn 110-MATERIALS #rx".*-(starter|solution).rkt"))
-(define (in-110-starters  fn) (check-in fn 110-MATERIALS #rx".*-starter.rkt"))
-(define (in-110-solutions fn) (check-in fn 110-MATERIALS #rx".*-solution.rkt"))
-
-(define (in-spd-materials fn) (check-in fn SPD-MATERIALS #rx".*-(starter|solution).rkt"))
-(define (in-spd-starters  fn) (check-in fn SPD-MATERIALS #rx".*-starter.rkt"))
-(define (in-spd-solutions fn) (check-in fn SPD-MATERIALS #rx".*-solution.rkt"))
-
-(define (check-in fn root regexp) (for ([p (find root regexp)])
-                                    (when (not-wxme-file? p)
-                                      (fn p))))
-
-(define (not-wxme-file? p)
-  (call-with-input-file* p
-    (lambda (in)
-      (not (regexp-match? #rx"wxme" (read-line in))))))
-
-
-
-(define (check-style/file p [only-report-zeroes? #f])
-  (parameterize ([stxs  #f]
-                 [lines #f]
-                 [elts  #f])
-    (stxs  (read-syntaxes p))
-    (lines (file->lines p))
-    (elts  (parse-elts (stxs) (lines)))
-
-    (let ([s (header (format "Style rules for ~a:" p) (check-style))])
-      (when (or (not only-report-zeroes?)
-                (not (= (score-m s) 1)))
-        (display-score s (current-output-port) #t)))))
-
-
-
-
-(define (find path regexp)
-  (cond [(member (file-or-directory-type path) '(file)) (if (regexp-match? regexp path) (list path) '())]
-        [(member (file-or-directory-type path) '(directory directory-link link))
-         (foldr append '() (map (lambda (p) (find p regexp)) (directory-list path #:build? #true)))]
-        [else '()]))
-
-
 (define (cons-if q x lst)
   (if q (cons x lst) lst))
-
-
-
-
