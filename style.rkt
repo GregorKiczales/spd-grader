@@ -10,6 +10,7 @@
 (provide grade-style
          grade-style*
          check-style
+         check-style/file
          include-correct-htdf-style-scores?
          
          check-style/htdf)
@@ -64,6 +65,19 @@
            (cond [(null? scores)           (list (rubric-item 'style #t "Style checking correct by default since no @htdf tags in file"))]
                  [(null? scores-to-report) (list (rubric-item 'style #t "Style checking"))]
                  [else scores-to-report]))))))
+
+
+(define (check-style/file p [only-report-zeroes? #f]) ;only for handin/scripts/console.rkt
+  (parameterize ([stxs  #f]
+                 [lines #f]
+                 [elts  #f])
+    (stxs  (read-syntaxes p))
+    (lines (file->lines p))
+    (elts  (parse-elts (stxs) (lines)))
+    (let ([s (header (format "Style rules for ~a:" p) (check-style))])
+      (when (or (not only-report-zeroes?)
+                (not (= (score-m s) 1)))
+        (display-score s (current-output-port) #t)))))
                
 
 (define (check-style/htdf tag-stx)
