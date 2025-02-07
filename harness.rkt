@@ -1,6 +1,7 @@
 #lang racket
 
-(require "grader.rkt")
+(require spd-grader/grader
+         spd-grader/style)
 
 (provide grade-some-starters grade-some-solutions
          grade-exam-starters grade-exam-solutions
@@ -59,4 +60,48 @@
                (let ([grade (grade-one path (open-output-nowhere "grade-some"))])
                  (when (warn? grade)
                    (displayln (format " ~a: ~a" path grade))))])))))
+
+(define (in-110-materials fn) (check-in fn 110-MATERIALS #rx".*-(starter|solution).rkt"))
+(define (in-110-starters  fn) (check-in fn 110-MATERIALS #rx".*-starter.rkt"))
+(define (in-110-solutions fn) (check-in fn 110-MATERIALS #rx".*-solution.rkt"))
+
+(define (in-spd-materials fn) (check-in fn SPD-MATERIALS #rx".*-(starter|solution).rkt"))
+(define (in-spd-starters  fn) (check-in fn SPD-MATERIALS #rx".*-starter.rkt"))
+(define (in-spd-solutions fn) (check-in fn SPD-MATERIALS #rx".*-solution.rkt"))
+
+(define (check-in fn root regexp) (for ([p (find root regexp)])
+                                    (when (not-wxme-file? p)
+                                      (fn p))))
+
+(define (not-wxme-file? p)
+  (call-with-input-file* p
+    (lambda (in)
+      (not (regexp-match? #rx"wxme" (read-line in))))))
+
+
+
+(define (check-style/file p options [only-display-zeroes? #f])
+  (parameterize ([stxs  #f]
+                 [lines #f]
+                 [elts  #f])
+    (stxs  (read-syntaxes p))
+    (lines (file->lines p))
+    (elts  (parse-elts (stxs) (lines)))
+
+    (let ([s (header (format "Style rules for ~a:" p) (check-style options))])
+      (when (or (not only-display-zeroes?)
+                (not (= (score-m s) 1)))
+        (display-score s (current-output-port) #t)))))
+
+
+
+
+(define (find path regexp)
+  (cond [(member (file-or-directory-type path) '(file)) (if (regexp-match? regexp path) (list path) '())]
+        [(member (file-or-directory-type path) '(directory directory-link link))
+         (foldr append '() (map (lambda (p) (find p regexp)) (directory-list path #:build? #true)))]
+        [else '()]))
+
+
+
 
