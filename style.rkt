@@ -67,14 +67,15 @@
                  [else scores-to-report]))))))
 
 
-(define (check-style/file p [only-report-zeroes? #f]) ;only for handin/scripts/console.rkt
+(define (check-style/file p options [include-ones? #f]) ;only for handin/scripts/console.rkt
   (parameterize ([stxs  #f]
                  [lines #f]
-                 [elts  #f])
+                 [elts  #f]
+                 [include-correct-htdf-style-scores? include-ones?])
     (stxs  (read-syntaxes p))
     (lines (file->lines p))
     (elts  (parse-elts (stxs) (lines)))
-    (let ([s (header (format "Style rules for ~a:" p) (check-style))])
+    (let ([s (header (format "Style rules for ~a:" p) (check-style options))])
       (when (or (not only-report-zeroes?)
                 (not (= (score-m s) 1)))
         (display-score s (current-output-port) #t)))))
