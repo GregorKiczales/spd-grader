@@ -76,7 +76,7 @@
     (lines (file->lines p))
     (elts  (parse-elts (stxs) (lines)))
     (let ([s (header (format "Style rules for ~a:" p) (check-style options))])
-      (when (or (not only-report-zeroes?)
+      (when (or include-ones?
                 (not (= (score-m s) 1)))
         (display-score s (current-output-port) #t)))))
                
