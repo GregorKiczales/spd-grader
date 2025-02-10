@@ -519,15 +519,19 @@
   (let ([v (atomic-d-value t)])
     (cond [(string? v)    `(string? ,(primary-param))]
           [(eqv? v false) `(false? ,(primary-param))]
-          [(eqv? v empty) `(empty? ,(primary-param))]        
-          [else (error* "Don't know how to guard distinct value ~a" v)])))
+          [(eqv? v empty) `(empty? ,(primary-param))]
+          [(equal? v 0)   `(zero? ,(primary-param))]         ;only here for SRNatural
+          [else
+           (error* "Don't know how to guard distinct value ~a" v)])))
 
 (define (test t)
   (if (atomic-d? t)
       (let ([v (atomic-d-value t)])
         (cond [(string? v)      `(string=? ,(primary-param) ,v)]
               [(eqv? v 'false)  `(false? ,(primary-param))]        
-              [(eqv? v 'empty)  `(empty? ,(primary-param))]))
+              [(eqv? v 'empty)  `(empty? ,(primary-param))]
+              [(equal? v 0)     `(zero? ,(primary-param))])) ;only here for SRNatural
+      
       (cond [(compound? t)                          `(,(compound-predicate t) ,(primary-param))]
             [(memq t (list Number Integer Natural)) `(number?  ,(primary-param))]
             [(eqv? t String)                        `(string?  ,(primary-param))]
