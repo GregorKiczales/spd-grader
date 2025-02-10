@@ -30,7 +30,7 @@
 (struct %mref      %type-expr (type-name fn-for-t))
 
 ;;
-;; Now we essentially export what we want, define a few extras, and define a constructor functions and
+;; Now we essentially export what we want, define a few extras, and define constructor functions and
 ;; constructor macros that make calls to the constructors look better and also ensure we only produce
 ;; well-formed type exprs.
 ;;
@@ -87,7 +87,7 @@
 ;;
 (define (parse-referred-to-types lox who allow-one-of? allow-compound? allow-ref?)
   (map (lambda (x)
-         (cond [(or (string? x) (memq x (list false empty true)))  (atomic-d x)]
+         (cond [(or (string? x) (memq x (list false empty true)) (and (number? x) (zero? x)))  (atomic-d x)]
                [(primitive-type? x)                 x]
                
                [(and allow-compound? (compound? x)) x]
@@ -98,10 +98,10 @@
        lox))
 
 
-(define (make-listof-type lo-type-name fn-for-lot type-name [fn-for-t (void)])
+(define (make-listof-type lo-type-name fn-for-lot-name type [fn-for-t-name (void)])
   (%one-of (list (atomic-d empty)
-                 (%compound (list (if (primitive-type? type-name) type-name (%ref type-name fn-for-t))
-                                  (%sref lo-type-name fn-for-lot))
+                 (%compound (list (if (primitive-type? type) type (%ref type fn-for-t-name))
+                                  (%sref lo-type-name fn-for-lot-name))
                            'cons 'cons?
                            '(first rest)))))
 
