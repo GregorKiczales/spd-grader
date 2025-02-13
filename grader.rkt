@@ -23,8 +23,6 @@
 
 
 
-(define LINE-LENGTH-LIMIT 80)
-
 (define EVAL-LIMITS '(15 128)) ; 15 seconds shallow time, 128 MB  !!!
 
 
