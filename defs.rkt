@@ -16,6 +16,7 @@
 (define LINE-LENGTH-LIMIT 80)
 
 (define-for-syntax TOPICS '(other
+                            style
                             eval-etc
                             dd-template-rules
                             dd-template

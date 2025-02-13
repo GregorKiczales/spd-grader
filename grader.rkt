@@ -26,29 +26,6 @@
 
 (define LINE-LENGTH-LIMIT 80)
 
-(define-for-syntax TOPICS '(other
-                            style
-                            eval-etc
-                            signature
-                            test-validity test-thoroughness 
-                            template-origin
-                            template
-                            template-intact
-                            submitted-tests additional-tests))
-
-(define            TOPICS '(other
-                            style
-                            eval-etc
-                            starter-intact
-                            signature
-                            test-validity test-thoroughness 
-                            template-origin
-                            template
-                            template-intact
-                            submitted-tests additional-tests))
-
-(define EARLY-REPORT-TOPICS '(style eval-etc starter-intact signature test-validity test-thoroughness))
-
 (define EVAL-LIMITS '(15 128)) ; 15 seconds shallow time, 128 MB  !!!
 
 
