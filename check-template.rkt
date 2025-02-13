@@ -99,53 +99,48 @@
 
 
 (define (grade-dd-rules-and-template* n type)
-  (recovery-point grade-dd-rules-and-template
-    (assert-context--@htdd)
+  (assert-context--@htdd)
     (weights (.3 *)
       (grade-dd-rules*    n type)      
-      (grade-dd-template* n type))))
+      (grade-dd-template* n type)))
 
 (define (grade-dd-rules* n type)
-  (recovery-point grade-dd-rules
-    (assert-context--@htdd)
-    (let* ([htdd    (car (context))]
-           [dd-name (cadr htdd)]
-           [rules   (find-@dd-template-rules-used-in-dd n)])
-      (if (not rules)
-          (rubric-item 'dd-template-rules #f
-                       "DD template rules: could not find ~a @dd-template-rules tag in (@htdd ~a)" (number->ordinal* n) dd-name)
-          (check-dd-rules type rules)))))
+  (assert-context--@htdd)
+  (let* ([htdd    (car (context))]
+         [dd-name (cadr htdd)]
+         [rules   (find-@dd-template-rules-used-in-dd n)])
+    (if (not rules)
+        (rubric-item 'dd-template-rules #f
+                     "DD template rules: could not find ~a @dd-template-rules tag in (@htdd ~a)" (number->ordinal* n) dd-name)
+        (check-dd-rules type rules))))
 
 (define (grade-dd-template* n type)
-  (recovery-point grade-dd-template
-    (assert-context--@htdd)
-    (let* ([htdd    (car (context))]
-           [dd-name (cadr htdd)]
-           [rules   (find-@dd-template-rules-used-in-dd n)]
-           [defn    (find-template-in-dd n)])
-      (if (not defn)
-          (rubric-item 'dd-template #f
-                       "DD template: could not find template function definition in (@htdd ~a)" dd-name)
-          (check-dd-template type defn)))))
+  (assert-context--@htdd)
+  (let* ([htdd    (car (context))]
+         [dd-name (cadr htdd)]
+         [rules   (find-@dd-template-rules-used-in-dd n)]
+         [defn    (find-template-in-dd n)])
+    (if (not defn)
+        (rubric-item 'dd-template #f
+                     "DD template: could not find template function definition in (@htdd ~a)" dd-name)
+        (check-dd-template type defn))))
 
 (define (grade-template/types* lot)
-  (recovery-point grade-template
-    (assert-context--@htdf)
-    (let* ([htdf (car (context))]
-           [defn (find-template-in-@template 1)])
-      (cond [(not defn) 
-             (rubric-item 'template #f "Template: could not find @template tag in ~a" htdf)]
-            [else (check-template/types lot defn)]))))
+  (assert-context--@htdf)
+  (let* ([htdf (car (context))]
+         [defn (find-template-in-@template 1)])
+    (cond [(not defn) 
+           (rubric-item 'template #f "Template: could not find @template tag in ~a" htdf)]
+          [else (check-template/types lot defn)])))
 
 (define (grade-template/body* params body)
-  (recovery-point grade-template
-    (assert-context--@htdf)
-    (let* ([htdf (car (context))]
-           [defn (find-template-in-@template 1)])
-      (cond [(not defn) 
-             (rubric-item 'template #f "Template: could not find @template tag in ~a" htdf)]
-            [else
-             (check-template/body defn `(define (fn-for ,@params) ,body))]))))
+  (assert-context--@htdf)
+  (let* ([htdf (car (context))]
+         [defn (find-template-in-@template 1)])
+    (cond [(not defn) 
+           (rubric-item 'template #f "Template: could not find @template tag in ~a" htdf)]
+          [else
+           (check-template/body defn `(define (fn-for ,@params) ,body))])))
 
 
 
@@ -633,30 +628,27 @@
     [(_ n dd-name)            #'(grade-template-intact-from-type-name  n `dd-name)]))                                             
 
 (define (grade-template-intact-from-param-body n params body)
-  (recovery-point grade-template-intact
-    (assert-context--@htdf)
-    (grade-template-intact-from-define n `(define (fn-for-x ,@params) ,body))))
+  (assert-context--@htdf)
+  (grade-template-intact-from-define n `(define (fn-for-x ,@params) ,body)))
 
 (define (grade-template-intact-from-type-name n dd-name)
-  (recovery-point grade-template-intact
-    (if (not (pair? (htdd-templates `(@htdd ,dd-name))))
-        (rubric-item 'template-intact #f "Template intact: incorrect - could not find template in (@htdd ~a)" dd-name)
-        (let* ([template (car (htdd-templates `(@htdd ,dd-name)))] ;(define (fn-for... a) (cond ..))
-              ;[htdf (car (context))]
-              ;[defn (car (htdf-defns htdf))]
-               )
-          (grade-template-intact-from-define n template)))))
+  (if (not (pair? (htdd-templates `(@htdd ,dd-name))))
+      (rubric-item 'template-intact #f "Template intact: incorrect - could not find template in (@htdd ~a)" dd-name)
+      (let* ([template (car (htdd-templates `(@htdd ,dd-name)))] ;(define (fn-for... a) (cond ..))
+             ;[htdf (car (context))]
+             ;[defn (car (htdf-defns htdf))]
+             )
+        (grade-template-intact-from-define n template))))
 
 (define (grade-template-intact-from-define n template)
-  (recovery-point grade-template-intact
-    (assert-context--@htdf)
-    (let* ([htdf   (car (context))]
-           [defns  (htdf-defns htdf)])
-      (cond [(not (<= 1 n (length defns)))
-             (rubric-item 'template-intact #f
-                          "Template intact: incorrect - could not find ~a function definition in ~a" (number->ordinal* n) htdf)]
-            [else
-             (check-template-intact/body (list-ref defns (sub1 n)) template (cadr htdf))])))) ;!!! <<< GOES BACK TO CHECK-TEMPLATE-INTACT
+  (assert-context--@htdf)
+  (let* ([htdf   (car (context))]
+         [defns  (htdf-defns htdf)])
+    (cond [(not (<= 1 n (length defns)))
+           (rubric-item 'template-intact #f
+                        "Template intact: incorrect - could not find ~a function definition in ~a" (number->ordinal* n) htdf)]
+          [else
+           (check-template-intact/body (list-ref defns (sub1 n)) template (cadr htdf))]))) ;!!! <<< GOES BACK TO CHECK-TEMPLATE-INTACT
 
 ;; !!! goes to other file?
 (define (check-template-intact/body sub-defn sol-defn which)

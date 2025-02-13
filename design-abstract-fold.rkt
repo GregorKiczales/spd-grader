@@ -49,7 +49,7 @@ This solves problems about order of arguments.
 (define-syntax (grade-design-abstract-fold stx)
   (syntax-case stx (@template-origin)
     [(_ fn1 sig (#:copy-test d1 d2) (#:count-test d3 v3 d4 v4) (@template-origin . origins) (define (fn2 . args) . body))
-     #'(recovery-point grade-design-abstract-fold
+     #'(begin
          (unless (eqv? 'fn1 'fn2)
            (error 'grade-design-abstract-fold "fn name and name in function definition are not the same"))
          (grade-design-abstract-fold* 'fn1 'args (cdr 'sig) 'd1 'd2 'd3 'd4 'v3 'v4 '(@template-origin . origins) '(define (fn2 . args) . body)))]))

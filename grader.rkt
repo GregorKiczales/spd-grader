@@ -105,11 +105,6 @@
                                  (weights (*) (score-it 'other 1 1 #f "Internal grader system error, student given 100% on this problem. This does not necessarily mean the submission is correct. Grade may change when grader system error is fixed."))]))])
          exp ...)]))
 
-(define-syntax (recovery-point stx)
-  (syntax-case stx ()
-    [(_ w item ...)            ;!!! why is there no with-handlers here???
-     #'(begin item ...)]))
-
 (define-syntax (calling-evaluator stx)
   (syntax-case stx ()
     [(_ student? exp)
@@ -397,7 +392,7 @@ validity, and test thoroughness results are reported. No grade information is re
 (define-syntax (grade-htdd stx)
   (syntax-case stx ()
     [(_ n item ...)
-     #'(recovery-point grade-htdd
+     #'(begin
          (assert-context--@problem)
          (parameterize ([context (cons (get-htdd* 'n) (context))])
            (header (format "~a: " (car (context)))
@@ -453,7 +448,7 @@ validity, and test thoroughness results are reported. No grade information is re
     [(_ [(helper-name) n]  item ...)
      #'(grade-helper-for [(helper-name _) n] item ...)]
     [(_ [(helper-name helper-defn) n] item ...)
-     #'(begin ;recovery-point n !!!
+     #'(begin
          (assert-context--@problem)
          (let-values ([(helper-name helper-defn) (find-helper `n)])
            (grade-prerequisite 'template-intact
@@ -523,14 +518,13 @@ validity, and test thoroughness results are reported. No grade information is re
                                      ...)]))
 
 (define (grade-signature-1 n sol)
-  (recovery-point grade-signature
-    (assert-context--@htdf)
-    (let* ([htdf (car (context))]
-           [sigs (htdf-sigs htdf)])
-      (if (not (<= 1 n (length sigs)))
-          (score-it 'signature 1 0 #f "Signature: Could not find @signature tag.")
-          (check-signature (subst 'false #f (list-ref sigs (sub1 n)))
-                           (subst 'false #f (cons '@signature sol)))))))
+  (assert-context--@htdf)
+  (let* ([htdf (car (context))]
+         [sigs (htdf-sigs htdf)])
+    (if (not (<= 1 n (length sigs)))
+        (score-it 'signature 1 0 #f "Signature: Could not find @signature tag.")
+        (check-signature (subst 'false #f (list-ref sigs (sub1 n)))
+                         (subst 'false #f (cons '@signature sol))))))
 
 
 
@@ -854,7 +848,7 @@ validity, and test thoroughness results are reported. No grade information is re
   (syntax-case stx ()
     [(_ sol)   #'(grade-template-origin 1 sol)]
     [(_ n sol)
-     #'(recovery-point grade-template-origin
+     #'(begin
          (assert-context--@htdf)
 	 (let* ([htdf    (car (context))]
 		[to-tags (htdf-template-origins htdf)])
@@ -871,7 +865,7 @@ validity, and test thoroughness results are reported. No grade information is re
         [sol-templ ...]
         min
         test ...)
-     #'(recovery-point grade-refactoring
+     #'(begin
          (assert-context--@htdf)
          (weights (.15 .2 .15 *)
            (score-max (grade-signature n sol-sig) ...)
@@ -889,7 +883,7 @@ validity, and test thoroughness results are reported. No grade information is re
   (syntax-case stx ()
     [(_ constants) #'(grade-constants-use 1 constants)]
     [(_ n constants)
-     #'(recovery-point grade-constants-use
+     #'(begin
          (assert-context--@htdf)
          (let* ([htdf (car (context))]
                 [defns (htdf-defns htdf)]
@@ -902,7 +896,7 @@ validity, and test thoroughness results are reported. No grade information is re
 (define-syntax (grade-tests-constants-use stx)
   (syntax-case stx ()
     [(_ n constants)
-     #'(recovery-point grade-tests-constants-use
+     #'(begin
 	(assert-context--@htdf)
         (let* ([htdf (car (context))]
                [tests (htdf-checks htdf)])
@@ -931,7 +925,7 @@ validity, and test thoroughness results are reported. No grade information is re
 (define-syntax (grade-htdd-coherence stx)
   (syntax-case stx ()
     [(_)
-     #'(recovery-point grade-htdd-coherence
+     #'(begin
          (assert-context--@htdd)
          (check-htdd-coherence (car (context))))]))
 
@@ -1010,11 +1004,11 @@ validity, and test thoroughness results are reported. No grade information is re
 (define-syntax (grade-top-level-expression stx)
   (syntax-case stx ()
     [(_ must-use-free * defns ... value-expr)
-     #'(recovery-point grade-top-level-expression
+     #'(begin
 	 (assert-context--@problem)
          (check-top-level-expression `must-use-free '*              `(defns ...) `value-expr))]
     [(_ must-use-free may-use-values defns ... value-expr)
-     #'(recovery-point grade-top-level-expression
+     #'(begin
 	 (assert-context--@problem)
          (check-top-level-expression `must-use-free `may-use-values `(defns ...) `value-expr))]))
 
