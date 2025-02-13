@@ -27,6 +27,7 @@
 (define LINE-LENGTH-LIMIT 80)
 
 (define-for-syntax TOPICS '(other
+                            style
                             eval-etc
                             signature
                             test-validity test-thoroughness 
@@ -36,6 +37,7 @@
                             submitted-tests additional-tests))
 
 (define            TOPICS '(other
+                            style
                             eval-etc
                             starter-intact
                             signature
@@ -45,7 +47,7 @@
                             template-intact
                             submitted-tests additional-tests))
 
-(define EARLY-REPORT-TOPICS '(eval-etc starter-intact signature test-validity test-thoroughness))
+(define EARLY-REPORT-TOPICS '(style eval-etc starter-intact signature test-validity test-thoroughness))
 
 (define EVAL-LIMITS '(15 128)) ; 15 seconds shallow time, 128 MB  !!!
 
@@ -237,8 +239,6 @@
               (define (handle-submission-error exn)
                 (when (verbose-error-logging?)
                   (logr (format "Error: running submission ~a - ~a" filename (exn->string exn))))
-                ;; deliberately don't display error so students debug themselves
-                ;; rather than just try to debug from autograder reports
                 (display-overall-grade 0
                                        (format "Error running submission ~a." (exn->string exn))
                                        rpt)
@@ -299,7 +299,7 @@
                        (parameterize ([verbose? verb?]
                                       [early? earl?])
                          (cond [earl?
-                                (displayln/f "\n\nAssignment submitted for regrading before end of cooldown - only signature, test
+                                (displayln/f "\n\nAssignment submitted for regrading before end of cooldown - only style, signature, test
 validity, and test thoroughness results are reported. No grade information is reported.\n\n" rpt)
                                 (display-score s rpt #f)
                                 (score-m s)]
@@ -311,7 +311,6 @@ validity, and test thoroughness results are reported. No grade information is re
                abort-tag)))))
       
       #:mode 'text)))
-
 
 
 (define (default-grader)
@@ -863,7 +862,6 @@ validity, and test thoroughness results are reported. No grade information is re
                (score-it 'template-origin 1 0 #f "Template origin tag: could not find ~a template origin tag." (number->ordinal n))
                (check-template-origin (list-ref to-tags (sub1 n)) `sol))))]))
 
-;(define-syntax (grade-exact-problem-body stx)) ;deprecated, see pset-01-grader.rkt
 
 ;; !!! rename to grade-encapsulation (or delete)
 (define-syntax (grade-refactoring stx)
@@ -1006,8 +1004,6 @@ validity, and test thoroughness results are reported. No grade information is re
 
   #t)
 
-;; (ensure-tag-contains-elements '(@htdw *)
-;;                               '((define WIDTH 100)))
 
 ;; (env ...)
 ;;
@@ -1341,35 +1337,26 @@ validity, and test thoroughness results are reported. No grade information is re
 
 
 
+(define (find-grader handin-fn)
+  (let ([grader-path (handin->grader-path handin-fn)])
+    (if (and grader-path (file-exists? grader-path))
+        (auto-reload-procedure grader-path 'grader)
+        default-grader)))
 
-
-
-;; compiling graders and/or keeping a table of already loaded graders
-;; does not make any appreciable performance difference, so to keep
-;; things simple we just reload the grader each time
-
-(define (find-grader fn)
-  (let ([tag (find-assignment-tag fn)])
-    (if (not tag)
-        default-grader
-        (let* ([elts (string-split (symbol->string (cadr tag)) "/")]
-               [dir (apply build-path GRADERS-DIR (drop-right elts 1))]
-               #;
-               [compiled (build-path dir
-                                     "compiled"
-                                     (string-append (car (take-right elts 1)) "-grader_rkt.zo"))]
-               [source   (build-path dir
-                                     (string-append (car (take-right elts 1)) "-grader.rkt"))])
-          (auto-reload-procedure source 'grader)))))
-
-(define (has-grader? p)
+(define (has-grader? handin-fn)
   (with-handlers ([exn:fail? (lambda (e) #f)])
-    (let ([tag (find-assignment-tag p)])
-      (and tag
-           (let* ([elts (string-split (symbol->string (cadr tag)) "/")]
-                  [fn (build-path (apply build-path GRADERS-DIR (drop-right elts 1))
-                                  (string-append (car (take-right elts 1)) "-grader.rkt"))])
-             (file-exists? fn))))))
+    (let ([grader-path (handin->grader-path handin-fn)])
+      (and grader-path
+           (file-exists? grader-path)))))
+
+(define (handin->grader-path p)
+  (let ([tag (find-assignment-tag p)])
+    (and tag
+         (let* ([elts (string-split (symbol->string (cadr tag)) "/")]
+                [dir  (apply build-path GRADERS-DIR (drop-right elts 1))])
+           (build-path dir
+                       (string-append (car (take-right elts 1)) "-grader.rkt"))))))
+  
   
 
 (define (find-assignment-tag fn) (let-values ([(assgn-tag cwl-tag) (find-assgn-cwl-tags fn)]) assgn-tag))
