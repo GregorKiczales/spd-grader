@@ -22,7 +22,6 @@
          (all-from-out "score.rkt"))
 
 
-(define INTERNAL-DATA-LINE "Internal use only below here:")
 
 (define LINE-LENGTH-LIMIT 80)
 
