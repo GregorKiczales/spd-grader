@@ -176,10 +176,10 @@
                          [sig?                 "must not edit signature in starter file"]
                          [ces?                 "must not edit tests in starter-file"]
                          [tos?                 "must not edit template-origins in starter-file"])
-                   (cond [(@signature?       (car sol-sexps)) (loop (rest sol-sexps) #t   ces? tos? others?)]
-                         [(check?            (car sol-sexps)) (loop (rest sol-sexps) sig? #t   tos? others?)]
-                         [(@template-origin? (car sol-sexps)) (loop (rest sol-sexps) sig? #t   #t   others?)]
-                         [else                                (loop (rest sol-sexps) sig? ces? tos? #t)]))))])
+                   (cond [(@signature?       (car sol-sexps)) (loop (cdr sol-sexps) #t   ces? tos? others?)]
+                         [(check?            (car sol-sexps)) (loop (cdr sol-sexps) sig? #t   tos? others?)]
+                         [(@template-origin? (car sol-sexps)) (loop (cdr sol-sexps) sig? #t   #t   others?)]
+                         [else                                (loop (cdr sol-sexps) sig? ces? tos? #t)]))))])
     
     (ensure (unchanged? sol-sexps sub-sexps) msg)))
 
