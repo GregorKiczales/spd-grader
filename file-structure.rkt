@@ -1,6 +1,8 @@
-#lang racket
+#lang racket/base
 
-(require "defs.rkt"
+(require racket/function
+         racket/list
+         "defs.rkt"
          "utils.rkt")
 
 (provide (all-defined-out))
@@ -49,18 +51,18 @@
 
 (define (get-by-pred p)
   (let loop ([sexps (if (null? (context)) (sexps) (tag-sexps (car (context))))])
-    (cond [(empty? sexps) #f]
+    (cond [(null? sexps) #f]
           [(p (car sexps)) (car sexps)]
           [else
-           (loop (rest sexps))])))
+           (loop (cdr sexps))])))
 
 (define (get-by-index p n)
   (let loop ([i 0]                        
 	     [sexps (if (null? (context)) (sexps) (tag-sexps (car (context))))])
-    (cond [(empty? sexps)                 #f]
+    (cond [(null? sexps)                 #f]
 	  [(and (p (car sexps)) (= i n))  (car sexps)]
-	  [     (p (car sexps))           (loop (add1 i) (rest sexps))]
-	  [else                           (loop       i  (rest sexps))])))
+	  [     (p (car sexps))           (loop (add1 i) (cdr sexps))]
+	  [else                           (loop       i  (cdr sexps))])))
 
 (define (get-all-tests)
   (filter check? (sexps)))
@@ -130,13 +132,13 @@
 	(let* ([stx (car lo-stx)]
                [sexp (post-read-convert (syntax->datum stx))])
 	  (cond [(and (pair? sexp)
-		      (member (first sexp) '(@problem @htdw @htdd @htdf)))
-		 (let ([new-context (cons sexp (clear-context (first sexp) context))])
+		      (member (car sexp) '(@problem @htdw @htdd @htdf)))
+		 (let ([new-context (cons sexp (clear-context (car sexp) context))])
 		   (cons (elt (cdr new-context) stx sexp)
 			 (loop (cdr lo-stx)
 			       new-context)))]
                 [(and (pair? sexp)
-                      (eqv? (first sexp) '@signature))
+                      (eqv? (car sexp) '@signature))
                  (cons (elt context stx (subst 'false #f sexp)) ;!!! make this go away, false is a symbol in this case not a value
                        (loop (cdr lo-stx)
                              context))]

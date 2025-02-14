@@ -39,7 +39,7 @@
 (define-syntax (grade-signature-by-constraints stx)
   (syntax-case stx ()
     [(_ n sol)
-     #'(recovery-point grade-signature-by-constraints
+     #'(begin
          (assert-context--@htdf)
 	 (let* ([htdf (car (context))]
 		[sigs (htdf-sigs htdf)]
