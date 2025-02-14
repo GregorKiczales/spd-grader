@@ -6,10 +6,9 @@
          "walker.rkt"
          "grader.rkt"
          "utils.rkt"
+         "file-structure.rkt"
          "type.rkt"
-         (for-syntax "type.rkt")
-         ;spd/constants ;!!!
-         )
+         (for-syntax "type.rkt"))
 
 (module+ test
   (require rackunit))
@@ -160,6 +159,9 @@
     (combine-scores (weights* 1.0 '(*) (check-template/types-internal types defn)))))
 
 
+;; these 'allow-one-arg need to be here, they let us for example check accumulator functions where we might not know
+;; how many additional parameters there are
+
 ;; !!! these still need to use 'template-intact rubric item kind
 (define (check-questions/types types defn) (check-template-parts/types types defn 'check-questions/types 'allow-one-arg 'questions))
 ;; !!! these are not nearly ready to work because they depend on the call having the field selector directly inside of it
@@ -299,7 +301,7 @@
            ;; if no cond all rules are incorrect
            (for [(ty1 (one-of-subclasses ty))]
              (tally 'questions #f "missing question for subclass ~a" (rule-kind ty1))
-             (tally 'bodies      #f "missing answer for subclass ~a" (rule-kind ty1)))]
+             (tally 'bodies    #f "missing answer for subclass ~a" (rule-kind ty1)))]
           [else
            (tally 'bodies #t "cond expression")
            (let loop [(ts (one-of-subclasses ty))
@@ -307,7 +309,7 @@
              (cond [(and (empty? ts) (empty? qas)) (void)]
                    [(empty? ts)
                     (tally 'questions #f "extra cond question")
-                    (tally 'bodies      #f "extra cond answer")
+                    (tally 'bodies    #f "extra cond answer")
                     (loop '() (cdr qas))]
                    [(empty? qas)
                     (tally 'questions #f "missing cond question")
@@ -319,7 +321,7 @@
                           [qa  (car qas)])
                       (cond [(not (and (pair? qa) (= (length qa) 2)))
                              (tally 'questions #f "no question ~a" qa)
-                             (tally 'bodies #f "no answer ~a" qa)]
+                             (tally 'bodies    #f "no answer ~a" qa)]
                             [else
                              (check-question? t (car qa) rst)
                              (check t (cadr qa) "cond answer ")])
@@ -434,23 +436,31 @@
     (error* "More than one type is non-atomic ~a" types))
 
 
-  (let ([params (cdadr defn)])
-    (cond [(and (not (= (length params) (length types)))
-                (not (memq 'allow-one-arg options))
-               ;(not (= (length params) 1)) ;!!! Was allowing one-arg @template to be correct
-                )
-           (list (rubric-item 'template #f "Incorrect number of parameters."))]
-          [else
-           (fn-name (caadr defn))
-           
-           (parameterize ([primary-type #f]
-                          [primary-param #f]
-                          [additional-params '()])
-
-             (cond [(andmap (lambda (x) (or (atomic-nd? x) (atomic-d? x))) types)
-                    (primary-type  (car types))
-                    (primary-param (car (cdadr defn)))
-                    (additional-params  (cdr (cdadr defn)))]
+  (let ([params (fn-defn-parameters defn)])
+    (if (or (> (length types) (length params))
+            (and (not (= (length params) (length types)))
+                 (not (memq 'allow-one-arg options))))
+        
+        (list (rubric-item 'template #f "Number of parameters"))
+        
+        ;; 'allow-one-arg means that if there is one type in the grader we accept
+        ;; multiple params in the solution
+        (parameterize ([primary-type  #f]     
+                       [primary-param #f]
+                       [additional-params '()])
+          
+             (fn-name (fn-defn-name defn))
+             
+             (cond [(andmap atomic? types)
+                    (primary-type      (car types))
+                    (primary-param     (car params))
+                    (additional-params (cdr params))]
+                   
+                   [(not (= (length params) (length types)))
+                    (primary-type (car types))
+                    (primary-param (car params))
+                    (additional-params (cdr params))]
+                   
                    [else
                     (for ([type types]
                           [param params])
@@ -462,7 +472,7 @@
 
              (check (primary-type) (caddr defn))
              
-             (reverse scores))])))
+             (reverse scores)))))
 
 ;; !!! goes to other file
 (define (check-template-bodies sub0 sol0 answers?)
@@ -661,7 +671,7 @@
 
 (module+ test
 
-  (define Cat (compound (list Integer Integer) 'make-cat 'cat? '(cat-x cat-y)))
+  (define Cat (compound (Integer Integer) make-cat cat? (cat-x cat-y)))
 
   ;; top-level distinct (shouldn't actually happen, but forms a base case for testing)
   (check-equal? (map score-m (check-dd-rules-internal (atomic-d "green")
@@ -687,25 +697,25 @@
   
   ;; self-ref (note this type isn't well-formed SR since no base case, but it does
   ;; follow the less stringent formedness rules this checker needs
-  (check-equal? (map score-m (check-dd-rules-internal (compound (list Integer (sref 'Cat 'fn-for-cat))
-                                                                'make-cat 'cat?
-                                                                '(cat-x cat-foo))
+  (check-equal? (map score-m (check-dd-rules-internal (compound (Integer (sref Cat fn-for-cat))
+                                                                make-cat cat?
+                                                                (cat-x cat-foo))
                                                       '(compound self-ref)))
                 '(1 1))
   
   
   ;; self-ref rule missing
-  (check-equal? (map score-m (check-dd-rules-internal (compound (list Integer (sref 'Cat 'fn-for-cat))
-                                                                'make-cat 'cat?
-                                                                '(cat-x cat-foo))
+  (check-equal? (map score-m (check-dd-rules-internal (compound (Integer (sref Cat fn-for-cat))
+                                                                make-cat cat?
+                                                                (cat-x cat-foo))
                                                       '(compound)))
                 '(1 0))
   
   
   ;; ref
-  (check-equal? (map score-m (check-dd-rules-internal (compound (list Integer (ref 'Foo 'fn-for-foo))
-                                                                'make-cat 'cat?
-                                                                '(cat-x cat-foo))
+  (check-equal? (map score-m (check-dd-rules-internal (compound (Integer (ref Foo fn-for-foo))
+                                                                make-cat cat?
+                                                                (cat-x cat-foo))
                                                       '(compound ref)))
                 '(1 1))
   
@@ -731,8 +741,8 @@
   
   
   (check-equal? (map score-m (check-dd-rules-internal (one-of empty
-                                                              (compound (list "L" (sref 'Path 'fn-for-path)) 'cons 'cons? '(first rest))
-                                                              (compound (list "R" (sref 'Path 'fn-for-path)) 'cons 'cons? '(first rest)))
+                                                              (compound ("L" (sref Path fn-for-path)) cons cons? (first rest))
+                                                              (compound ("R" (sref Path fn-for-path)) cons cons? (first rest)))
                                                       '(one-of atomic-distinct compound self-ref compound self-ref)))
                 '(1 1 1 1 1 1))
   
@@ -840,13 +850,13 @@
   
   
   ;; 1 field is distinct
-  (check-equal? (map score-m (check-template/types-internal (list (compound (list Integer "hello") 'make-cat 'cat? '(cat-x cat-y)))
+  (check-equal? (map score-m (check-template/types-internal (list (compound (Integer "hello") make-cat cat? (cat-x cat-y)))
                                                             '(define (fn-for-cat c)
                                                                (... (cat-x c) (cat-y c)))))
                 '(1 1 1))
   
   ;; 1 field distinct, val in template
-  (check-equal? (map score-m (check-template/types-internal (list (compound (list Integer "hello") 'make-cat 'cat? '(cat-x cat-y)))
+  (check-equal? (map score-m (check-template/types-internal (list (compound (Integer "hello") make-cat cat? (cat-x cat-y)))
                                                             '(define (fn-for-cat c)
                                                                (... (cat-x c) "hello"))))
                 '(1 1 1))
@@ -856,27 +866,21 @@
   
   ;; self-ref (note this type isn't well-formed SR since no base case, but it does
   ;; follow the less stringent formedness rules this checker needs
-  (check-equal? (map score-m (check-template/types-internal (list (compound (list Integer (sref 'Cat 'fn-for-cat))
-                                                                            'make-cat 'cat?
-                                                                            '(cat-x cat-foo)))
+  (check-equal? (map score-m (check-template/types-internal (list (compound (Integer (sref Cat fn-for-cat)) make-cat cat? (cat-x cat-foo)))
                                                             '(define (fn-for-cat c)
                                                                (... (cat-x c) (fn-for-cat (cat-foo c))))))
                 '(1 1 1 1))
   
   
   ;; NR missing
-  (check-equal? (map score-m (check-template/types-internal (list (compound (list Integer (sref 'Cat 'fn-for-cat))
-                                                                            'make-cat 'cat?
-                                                                            '(cat-x cat-foo)))
+  (check-equal? (map score-m (check-template/types-internal (list (compound (Integer (sref Cat fn-for-cat)) make-cat cat? (cat-x cat-foo)))
                                                             '(define (fn-for-foo c)
                                                                (... (cat-x c) (cat-foo c)))))
                 '(1 1 1 0))
   
   
   ;; ref
-  (check-equal? (map score-m (check-template/types-internal (list (compound (list Integer (sref 'Cat 'fn-for-cat))
-                                                                            'make-cat 'cat?
-                                                                            '(cat-x cat-foo)))
+  (check-equal? (map score-m (check-template/types-internal (list (compound (Integer (sref Cat fn-for-cat)) make-cat 'cat? (cat-x cat-foo)))
                                                             '(define (fn-for-foo c)
                                                                (... (cat-x c) (fn-for-foo (cat-foo c))))))
                 '(1 1 1 1))
@@ -947,8 +951,8 @@
   
   
   (check-equal? (map score-m (check-template/types-internal (list (one-of empty
-                                                                          (compound (list "L" (sref 'Path 'fn-for-path)) 'cons 'cons? '(first rest))
-                                                                          (compound (list "R" (sref 'Path 'fn-for-path)) 'cons 'cons? '(first rest))))
+                                                                          (compound ("L" (sref Path fn-for-path)) cons cons? (first rest))
+                                                                          (compound ("R" (sref Path fn-for-path)) cons cons? (first rest))))
                                                             '(define (fn-for-path p)
                                                                (cond [(empty? p) (...)]
                                                                      [(string=? (first p) "L") (... "L" (fn-for-path (rest p)))]
@@ -1030,4 +1034,7 @@
                                                                      [                 (string=? f "y")  (...)]
                                                                      [                 (string=? f "x")  (...)]
                                                                      [else                               (... f)]))))
-                '(1 1 1 1 1 1 0 1 0 1 1 1 1)))
+  '(1 1 1 1 1 1 0 1 0 1 1 1 1))
+
+
+  )

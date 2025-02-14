@@ -23,7 +23,7 @@
 
 
 
-(define EVAL-LIMITS '(15 128)) ; 15 seconds shallow time, 128 MB  !!!
+(define EVAL-LIMITS '(15 128)) ; 15 seconds shallow time, 128 MB
 
 
 ;; Error handling strategy:  THIS IS OUT OF DATE!!!
@@ -57,6 +57,182 @@
 ;; One additional kind of error exists to allow writing (ensure (test x) "...") inside of graders.
 ;; These are represented as exn:fail:ensure-violation and are handled in grade-problem.
 ;;
+
+(define (autograde-file filename [verb? #t] [earl? #f] [rpt (current-output-port)] [logr displayln])
+  (let ([grader
+         (with-handlers ([exn:fail?
+                          (lambda (exn)
+                            (let ([msg (format "Error: problem loading grader for ~a - ~a" filename (exn->string exn))])
+                              (logr msg)
+                              (display msg rpt)))])
+           (find-grader filename))])
+    (autograde-file-with-grader filename grader verb? earl? rpt logr)))
+
+(define (autograde-file-with-grader filename grader [verb? #t] [earl? #f] [rpt (current-output-port)] [logr displayln])
+  ;; until we get going any error is a grader framework error and we just log it
+  (with-handlers ([exn:fail?
+                   (lambda (exn)
+                     (let ([msg (format "Error: framework error for submission ~a - ~a" filename (exn->string exn))])
+                       (logr msg)
+                       (displayln msg rpt)))])
+    
+    (call-with-input-file* filename
+      (lambda (in)
+        (read-line in)
+        (read-line in)
+        (let ([lang (line->language-level (read-line in))])
+          (parameterize ([sandbox-input                #f]
+                         [sandbox-output               #f]
+                         [sandbox-error-output         #f]
+                         [sandbox-propagate-exceptions #t]
+                         [error-value->string-handler (lambda (v s)
+                                                        ((current-value-printer) v))]
+                         ;[list-abbreviation-enabled
+                         ; (not (or (equal? lang '(special beginner))         ;!!! doesn't work because
+                         ;          (equal? lang '(special beginner-abbr))))] ;!!! line->language-level overrides w/ intermediate
+                         [sandbox-eval-limits         EVAL-LIMITS])
+
+            (let ([abort-tag (make-continuation-prompt-tag)])
+              
+              (define (handle-resource-error exn)
+                (when (verbose-error-logging?)
+                  (logr (format "Error: running submission ~a used too much ~a." filename (exn:fail:resource-resource exn))))
+                (display-overall-grade 0
+                                       (format "Submission used too much ~a" (exn:fail:resource-resource exn))
+                                       rpt)
+                (abort-current-continuation abort-tag (lambda () (void))))
+
+              (define (handle-submission-error exn)
+                (when (verbose-error-logging?)
+                  (logr (format "Error: running submission ~a - ~a" filename (exn->string exn))))
+                (display-overall-grade 0
+                                       (format "Error running submission ~a." (exn->string exn))
+                                       rpt)
+                (abort-current-continuation abort-tag (lambda () (void))))
+
+              (define (handle-framework-error exn)
+                (logr (format "Error: Framework error for submission ~a - ~a" filename (exn->string exn)))
+                (display-overall-grade 100
+                                       (format "Autograder framework error. ~a" (exn->string exn))
+                                       rpt)
+                (abort-current-continuation abort-tag (lambda () (void))))
+              
+              (call-with-continuation-prompt 
+               (lambda ()
+                 (let ([e
+                        ;; errors in this region are from running the submission, not autograding
+                        (with-handlers ([exn:fail:resource? handle-resource-error]
+                                        [exn:fail? handle-submission-error])
+                          (make-evaluator lang
+                                          in
+                                          #:requires '(spd-grader/tonka) ;grader runtime for playing in sandbox
+
+                                          ;; !!! there's a dependency inversion here since spd-grader really isn't
+                                          ;; !!! supposed to know anything about the UBC 110 server configuration
+                                          #:allow-for-load (list
+                                                            ;; hard-coded for our server
+                                                            "/etc/ssl/certs/ca-certificates.crt"
+                                                            "/etc/ssl/cert.pem"
+                                                            "/home/c/cs-110/.racket/racket-prefs.rktd"
+                                                            ;; try to do the right thing for local testing
+                                                            (find-system-path 'pref-file)
+                                                            (let-values ([(base name is-dir) (split-path (find-system-path 'pref-file))])
+                                                              (build-path base "_LOCKracket-prefs.rktd")))
+                                          #:allow-read  (list "/etc/ssl/cert.pem"
+                                                              "/usr/lib/ssl/cert.pem"
+                                                              "/usr/lib/ssl/certs")))])
+                   ;; from here till we get inside grade-submission any errors are framework errors
+                   (with-handlers ([exn:fail? handle-framework-error ])
+                     (let ([s
+                            (parameterize ([evaluator 
+                                            (lambda (x)
+                                              ;; these are errors when the grader makes additional calls to the evaluator
+                                              ;; we abort on resource errors and let others through
+                                              (with-handlers ([exn:fail:resource? handle-resource-error])
+                                                (e (if (string? x) `(identity ,x) x))))]
+                                           [logger    logr]
+                                           [context   '()]
+                                           [stxs      #f]
+                                           [elts      #f]
+                                           [lines     #f])
+                              (stxs  (read-syntaxes filename))    ;!!! The file ends up being read 3 times
+                              (lines (file->lines filename))      ;!!! Is that a source of our hangs?
+                              (elts  (parse-elts (stxs) (lines)))
+                              (grader))])
+
+                       ;; we now have a score, time to render it
+                       (parameterize ([verbose? verb?]
+                                      [early? earl?])
+                         (cond [earl?
+                                (displayln/f "\n\nAssignment submitted for regrading before end of cooldown - only style, signature, test
+validity, and test thoroughness results are reported. No grade information is reported.\n\n" rpt)
+                                (display-score s rpt #f)
+                                (score-m s)]
+                               [else
+                                (display-overall-grade (inexact->exact (round (* 100 (score-m s)))) "" rpt)
+                                (displayln/f "\n\n" rpt)
+                                (display-score s rpt #t)
+                                (score-m s)]))))))
+               abort-tag)))))
+      
+      #:mode 'text)))
+
+
+(define (default-grader)
+  (grade-submission 
+    (weights (1)
+      (rubric-item 'other #t "No custom grader exists for this starter."))))
+
+
+;; grade-* syntax
+
+(define-syntax (grade-submission stx)
+  (syntax-case stx ()
+    [(_ item ...)
+     #`(per-problem-error-handling "prior to (@problem 1)"
+         (send-definitions '#,(filter stx-define? (syntax->list #'(item ...))))
+         (header "Overall submission: "
+                 (weights (*) #,@(filter stx-not-define? (syntax->list #'(item ...))))))]))
+
+
+(define (send-definitions defines)
+  (let [(names (map (lambda (def)
+                      (if (list? (cadr def))
+                          (caadr def)
+                          (cadr def)))
+                    defines))]
+    (calling-evaluator #f `(define %%fns (local ,defines (list ,@names))))
+    (for ([name names]
+          [i (in-naturals 0)])
+      (calling-evaluator #f `(define ,name (list-ref %%fns ,i))))))
+
+
+(define-for-syntax (stx-define? stx)
+  (syntax-case stx (define define-struct define-values)
+    [(define (id ...) body) #t]
+    [(define id body) #t]
+    [(define-values (id ...) expr) #t]
+    [(define-struct id . args) #t]
+    [_ #f]))
+
+(define-for-syntax (stx-not-define? stx)
+  (syntax-case stx (define define-struct define-values)
+    [(define (id ...) body) #f]
+    [(define id body) #f]
+    [(define-struct id . args) #f]
+    [_ #t]))
+
+
+
+(define-syntax (grade-problem stx)
+  (syntax-case stx ()
+    [(_ n item ...)
+     #'(begin
+         (assert-context--top-level)
+         (header (format "~a: " `(@problem ,n))
+           (per-problem-error-handling `(@problem ,n)
+             (parameterize ([context (cons (get-problem* n) (context))])
+               (weights (*) item ...)))))]))
 
 (define-syntax (per-problem-error-handling stx) ;used in grade-problem 
   (syntax-case stx ()
@@ -165,178 +341,7 @@
                (loop        sol  (cdr sub)))])))
 
 
-(define (autograde-file filename [verb? #t] [earl? #f] [rpt (current-output-port)] [logr displayln])
-  (let ([grader
-         (with-handlers ([exn:fail? (lambda (exn)
-                                      (logr (format "Error: problem loading grader for ~a - ~a" filename (exn->string exn))))])
-           (find-grader filename))])
-    (autograde-file-with-grader filename grader verb? earl? rpt logr)))
 
-(define (autograde-file-with-grader filename grader [verb? #t] [earl? #f] [rpt (current-output-port)] [logr displayln])               
-  ;; until we get going any error is a grader framework error and we just log it
-  (with-handlers ([exn:fail?
-                   (lambda (exn)
-                     (logr (format "Error: framework error for submission ~a - ~a"
-                                   filename
-                                   (exn->string exn))))])
-    (call-with-input-file* filename
-      (lambda (in)
-        (read-line in)
-        (read-line in)
-        (let ([lang (line->language-level (read-line in))])
-          (parameterize ([sandbox-input                #f]
-                         [sandbox-output               #f]
-                         [sandbox-error-output         #f]
-                         [sandbox-propagate-exceptions #t]
-                         [error-value->string-handler (lambda (v s)
-                                                        ((current-value-printer) v))]
-                         ;[list-abbreviation-enabled
-                         ; (not (or (equal? lang '(special beginner))         ;!!! doesn't work because
-                         ;          (equal? lang '(special beginner-abbr))))] ;!!! line->language-level overrides w/ intermediate
-                         [sandbox-eval-limits         EVAL-LIMITS])
-
-            (let ([abort-tag (make-continuation-prompt-tag)])
-              
-              (define (handle-resource-error exn)
-                (when (verbose-error-logging?)
-                  (logr (format "Error: running submission ~a used too much ~a." filename (exn:fail:resource-resource exn))))
-                (display-overall-grade 0
-                                       (format "Submission used too much ~a" (exn:fail:resource-resource exn))
-                                       rpt)
-                (abort-current-continuation abort-tag (lambda () (void))))
-
-              (define (handle-submission-error exn)
-                (when (verbose-error-logging?)
-                  (logr (format "Error: running submission ~a - ~a" filename (exn->string exn))))
-                (display-overall-grade 0
-                                       (format "Error running submission ~a." (exn->string exn))
-                                       rpt)
-                (abort-current-continuation abort-tag (lambda () (void))))
-
-              (define (handle-framework-error exn)
-                ((logger) (format "Error: Framework error for submission ~a - ~a"
-                                  filename
-                                  (exn->string exn)))
-                (display-overall-grade 100
-                                       (format "Autograder framework error. ~a"
-                                               (exn->string exn))
-                                       rpt)
-                (abort-current-continuation abort-tag (lambda () (void)))) ;!!! added 1/31/24
-              
-              (call-with-continuation-prompt 
-               (lambda ()
-                 (let ([e
-                        ;; this region is errors when originally running the submission
-                        (with-handlers ([exn:fail:resource? handle-resource-error]
-                                        [exn:fail? handle-submission-error])                            
-                          (make-evaluator lang
-                                          in
-                                          #:requires '(spd-grader/tonka) ;grader runtime for playing in sandbox '(spd/tags)
-                                          
-                                          #:allow-for-load (list
-                                                            ;; hard-coded for our server
-                                                            "/etc/ssl/certs/ca-certificates.crt"
-                                                            "/etc/ssl/cert.pem"
-                                                            "/home/c/cs-110/.racket/racket-prefs.rktd"
-                                                            ;; try to do the right thing for local testing
-                                                            (find-system-path 'pref-file)
-                                                            (let-values ([(base name is-dir) (split-path (find-system-path 'pref-file))])
-                                                              (build-path base "_LOCKracket-prefs.rktd")))
-                                          #:allow-read  (list "/etc/ssl/cert.pem"
-                                                              "/usr/lib/ssl/cert.pem"
-                                                              "/usr/lib/ssl/certs")))])
-                   ;; from here till we get inside grade-submission any errors are framework errors
-                   (with-handlers ([exn:fail? handle-framework-error ])
-                     (let ([s
-                            (parameterize ([evaluator 
-                                            (lambda (x)
-                                              ;; these are errors when the grader makes additional calls to the evaluator
-                                              ;; we abort on resource errors and let others through
-                                              (with-handlers ([exn:fail:resource? handle-resource-error])
-                                                (e (if (string? x) `(identity ,x) x))))]
-                                           [logger    logr]
-                                           [context   '()]
-                                           [stxs      #f]
-                                           [elts      #f]
-                                           [lines     #f])
-                              (stxs  (read-syntaxes filename))
-                              (lines (file->lines filename))
-                              (elts  (parse-elts (stxs) (lines)))
-                              (grader))])
-
-                       ;; we now have a score, time to render it
-                       (parameterize ([verbose? verb?]
-                                      [early? earl?])
-                         (cond [earl?
-                                (displayln/f "\n\nAssignment submitted for regrading before end of cooldown - only style, signature, test
-validity, and test thoroughness results are reported. No grade information is reported.\n\n" rpt)
-                                (display-score s rpt #f)
-                                (score-m s)]
-                               [else
-                                (display-overall-grade (inexact->exact (round (* 100 (score-m s)))) "" rpt)
-                                (displayln/f "\n\n" rpt)
-                                (display-score s rpt #t)
-                                (score-m s)]))))))
-               abort-tag)))))
-      
-      #:mode 'text)))
-
-
-(define (default-grader)
-  (grade-submission 
-    (weights (1)
-      (rubric-item 'other #t "No custom grader exists for this starter."))))
-
-
-;; grade-* syntax
-
-(define-syntax (grade-submission stx)
-  (syntax-case stx ()
-    [(_ item ...)
-     #`(per-problem-error-handling "prior to (@problem 1)"
-         (send-definitions '#,(filter stx-define? (syntax->list #'(item ...))))
-         (header "Overall submission: "
-                 (weights (*) #,@(filter stx-not-define? (syntax->list #'(item ...))))))]))
-
-
-(define (send-definitions defines)
-  (let [(names (map (lambda (def)
-                      (if (list? (cadr def))
-                          (caadr def)
-                          (cadr def)))
-                    defines))]
-    (calling-evaluator #f `(define %%fns (local ,defines (list ,@names))))
-    (for ([name names]
-          [i (in-naturals 0)])
-      (calling-evaluator #f `(define ,name (list-ref %%fns ,i))))))
-
-
-(define-for-syntax (stx-define? stx)
-  (syntax-case stx (define define-struct define-values)
-    [(define (id ...) body) #t]
-    [(define id body) #t]
-    [(define-values (id ...) expr) #t]
-    [(define-struct id . args) #t]
-    [_ #f]))
-
-(define-for-syntax (stx-not-define? stx)
-  (syntax-case stx (define define-struct define-values)
-    [(define (id ...) body) #f]
-    [(define id body) #f]
-    [(define-struct id . args) #f]
-    [_ #t]))
-
-
-
-(define-syntax (grade-problem stx)
-  (syntax-case stx ()
-    [(_ n item ...)
-     #'(begin
-         (assert-context--top-level)
-         (header (format "~a: " `(@problem ,n))
-           (per-problem-error-handling `(@problem ,n)
-             (parameterize ([context (cons (get-problem* n) (context))])
-               (weights (*) item ...)))))]))
 
 
 (define (not-graded)
