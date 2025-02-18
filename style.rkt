@@ -67,18 +67,19 @@
                  [else scores-to-report]))))))
 
 
-(define (check-style/file p options [include-ones? #f]) ;only for handin/scripts/console.rkt
+(define (check-style/file filename options [include-ones? #f]) ;only for handin/scripts/console.rkt
   (parameterize ([stxs  #f]
                  [lines #f]
                  [elts  #f]
                  [include-correct-htdf-style-scores? include-ones?])
-    (stxs  (read-syntaxes p))
-    (lines (file->lines p))
-    (elts  (parse-elts (stxs) (lines)))
-    (let ([s (header (format "Style rules for ~a:" p) (check-style options))])
-      (when (or include-ones?
-                (not (= (score-m s) 1)))
-        (display-score s (current-output-port) #t)))))
+    (let ([bytes (call-with-input-file* filename port->bytes)])
+      (stxs  (call-with-input-bytes bytes (lambda (in) (read-syntaxes filename in))))
+      (lines (call-with-input-bytes bytes port->lines))
+      (elts  (parse-elts (stxs) (lines)))
+      (let ([s (header (format "Style rules for ~a:" filename) (check-style options))])
+        (when (or include-ones?
+                  (not (= (score-m s) 1)))
+          (display-score s (current-output-port) #t))))))
                
 
 (define (check-style/htdf tag-stx)

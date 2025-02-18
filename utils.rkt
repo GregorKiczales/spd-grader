@@ -49,7 +49,7 @@
   
   (define (pc-helper v)
     (parameterize ([pc:booleans-as-true/false #t]
-                   [pc:abbreviate-cons-as-list #t];!!!(list-abbreviation-enabled)]
+                   [pc:abbreviate-cons-as-list #t]
                    [pc:constructor-style-printing #t]
                    [pc:add-make-prefix-to-constructor #t])
       (pc:print-convert v)))
@@ -114,8 +114,8 @@
 
 
 (define (line->language-level line)
-  (cond [(string-contains? line "htdp-beginner-reader")            '(special intermediate) #;'(special beginner)]   ;so we can define fns.
-        [(string-contains? line "htdp-beginner-abbr-reader")       '(special intermediate) #;'(special beginner-abbr)]
+  (cond [(string-contains? line "htdp-beginner-reader")            '(special intermediate)]   ;so we can define fns.
+        [(string-contains? line "htdp-beginner-abbr-reader")       '(special intermediate)]
         [(string-contains? line "htdp-intermediate-reader")        '(special intermediate)]
         [(string-contains? line "htdp-intermediate-lambda-reader") '(special intermediate-lambda)]
         [(string-contains? line "htdp-advanced-reader")            '(special advanced)]
