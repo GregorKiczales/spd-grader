@@ -2,6 +2,7 @@
 
 (require racket/function
          racket/list
+         racket/port       
          "defs.rkt"
          "utils.rkt")
 
@@ -82,17 +83,15 @@
 				 (eqv? (caaddr test-actual) fn-name)))))))
 	  (sexps)))
 
-(define (read-syntaxes fn)
+(define (read-syntaxes filename in)
   (with-handlers [(exn:fail? (lambda (e) '()))]
-    (call-with-input-file fn
-      (lambda (p)
-        (parameterize ([read-accept-reader #t]
-                       [read-case-sensitive #t]
-                       [read-decimal-as-inexact #f] ;to match teaching languages
-                       [current-input-port p])
-          (port-count-lines! p) ;line numbers will include 3 hidden lines.
-          
-          (cdr (syntax->list (cadddr (syntax->list (read-syntax fn p))))))))))
+    (parameterize ([read-accept-reader #t]
+                   [read-case-sensitive #t]
+                   [read-decimal-as-inexact #f] ;to match teaching languages
+                   [current-input-port in])
+      (port-count-lines! in) ;line numbers will include 3 hidden lines.
+      
+      (cdr (syntax->list (cadddr (syntax->list (read-syntax filename in))))))))
 
 
 

@@ -203,13 +203,13 @@
              [stxs stxs])
     (cond [(null? stxs) env]
           [else (loop (generate-env/one (car stxs) env) (cdr stxs))])))
-
+#;
 (define (file->syntaxes filename)
   (cdr (syntax-e (cadddr (syntax-e (parameterize ([read-accept-reader #t])
                                      (with-input-from-file filename
                                        read-syntax
                                        #:mode 'text)))))))
-
+#;
 ;; path (syntax stx-e Kind (listof (or/c Context)) (listof (cons/c symbol syntax)) (or/c #f syntax) -> any) -> void
 (define (walk-file filename p)
   (let* ([file-stxs (file->syntaxes filename)]

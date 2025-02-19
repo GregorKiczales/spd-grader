@@ -62,7 +62,6 @@
 
 (define current-value-printer   (make-parameter #f))
 (define verbose-error-logging?  (make-parameter #t))
-;(define list-abbreviation-enabled (make-parameter #f))
 
 
 (struct exn:fail:student-error    exn:fail:user ())         ;student errors like missing tags
