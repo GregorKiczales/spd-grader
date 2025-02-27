@@ -114,21 +114,21 @@
                                                                  in
                                                                  #:requires '(spd-grader/tonka) ;grader runtime for playing in sandbox
 
-                                                                 ;; !!! there's a dependency inversion here since spd-grader really isn't
-                                                                 ;; !!! supposed to know anything about the UBC 110 server configuration
+                                                                 ;; !!! for some reason getting rid of this dependency inversion doesn't work
+                                                                 ;; !!! even running just spd-grader (not inside the server) on the cs110
+                                                                 ;; !!! machine needs these. Not sure why.
                                                                  #:allow-for-load (list
                                                                                    ;; hard-coded for our server
                                                                                    ;"/etc/ssl/certs/ca-certificates.crt"
-                                                                                   ;"/etc/ssl/cert.pem"
+                                                                                   "/etc/ssl/cert.pem"
                                                                                    ;"/home/c/cs-110/.racket/racket-prefs.rktd"
                                                                                    ;; try to do the right thing for local testing
                                                                                    (find-system-path 'pref-file)
                                                                                    (let-values ([(base name is-dir) (split-path (find-system-path 'pref-file))])
                                                                                      (build-path base "_LOCKracket-prefs.rktd")))
-                                                                 #:allow-read  (list; "/etc/ssl/cert.pem"
-                                                                                     ;"/usr/lib/ssl/cert.pem"
-                                                                                     ;"/usr/lib/ssl/certs"
-                                                                                )))])
+                                                                 #:allow-read  (list "/etc/ssl/cert.pem"
+                                                                                     "/usr/lib/ssl/cert.pem"
+                                                                                     "/usr/lib/ssl/certs")))])
                                           ;; from here till we get inside grade-submission any errors are internal errors
                                           (with-handlers ([exn:fail? handle-internal-error])
                                             (let ([s
