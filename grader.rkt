@@ -26,45 +26,38 @@
 (define EVAL-LIMITS '(15 128)) ; 15 seconds shallow time, 128 MB
 
 
-;; Error handling strategy:  THIS IS OUT OF DATE!!!
-;;
-;; By the time the grader code starts running the code has passed checked-syntax and run. So it is well formed,
-;; and the only runtime errors occur inside of check-expects. This means:
-;; 
-;;  - The grader can assume code is well formed, syntacticly and in terms of bindings. This
-;;    greatly simplifies the picking about of code into different forms and expressions.
-;;
-;;    --> Any errors in grader code that syntactically analyzes the submission are errors in
-;;        the grader itself.  These are handled on a per-problem basis by grade-problem, with
-;;        the problem producing a mark of 1, but logging the issue so we can spot it easily.
-;;
-;;  - BUT this is not true for all aspects of tag structure. In particular problem and htdf tags
-;;    may be missing. function definitions may be misnamed etc.
-;;
-;;    --> These kinds of errors are represented by exn:fail:student-error and are handled on
-;;        a per problem basis in grade-problem. grade-submission also handles them.
-;; 
-;;  - The grader cannot assume valid tests will run without errors.
-;;
-;;    --> Any errors in evaluation of teaching language code should be treated as errors in the
-;;        student code.  They might not be, if for example we inject faulty code. But any errors
-;;        in how the grader constructs such code are likely to be found during testing, or fail
-;;        on a large enough number of submissions that we will notice them. These are represented
-;;        by exn:fail:eval-error, and handled in grade-problem, with that problem producing a
-;;        mark of 0. These are quite common, so they are not logged. They will be easy to find
-;;        in grading reports though.
-;;
-;; One additional kind of error exists to allow writing (ensure (test x) "...") inside of graders.
-;; These are represented as exn:fail:ensure-violation and are handled in grade-problem.
-;;
 
-(define (autograde-file filename [verb? #t] [earl? #f] [rpt (current-output-port)] [logr displayln])
+(define (server-make-evaluator language
+                               filename
+                               #:requires                 [requires '()]
+                               #:allow-for-require        [allow-for-require '()]
+                               #:allow-for-load           [allow-for-load '()]
+                               #:allow-read               [allow-read '()]
+                               #:allow-syntactic-requires [allow-syntactic-requires #f])
+  (make-evaluator language
+                  filename
+                  #:requires                 requires
+                  #:allow-for-require        allow-for-require
+                  #:allow-for-load           (list* "/etc/ssl/certs/ca-certificates.crt"
+                                                    "/etc/ssl/cert.pem"
+                                                    "/home/c/cs-110/.racket/racket-prefs.rktd"
+                                                    allow-for-load)
+                  #:allow-read               (list* "/etc/ssl/cert.pem"
+                                                    "/usr/lib/ssl/cert.pem"
+                                                    "/usr/lib/ssl/certs"
+                                                    allow-read)
+                  #:allow-syntactic-requires allow-syntactic-requires))
+                               
+
+
+
+(define (autograde-file filename [verb? #t] [earl? #f] [rpt (current-output-port)] [logr displayln] [make-evaluator make-evaluator])
   (with-handlers ([exn:fail?
                    (lambda (exn)
                      (let ([msg (format "Internal error: grading ~a - ~a" filename (exn->string exn))])
                        (logr (format "Error: ~a" msg))
                        (displayln msg rpt)))])
-    (let* ([bytes (call-with-input-file* filename port->bytes)]
+    (let* ([bytes (file->bytes filename)]
            [grader
             (with-handlers ([exn:fail?
                              (lambda (exn)
@@ -125,16 +118,17 @@
                                                                  ;; !!! supposed to know anything about the UBC 110 server configuration
                                                                  #:allow-for-load (list
                                                                                    ;; hard-coded for our server
-                                                                                   "/etc/ssl/certs/ca-certificates.crt"
-                                                                                   "/etc/ssl/cert.pem"
-                                                                                   "/home/c/cs-110/.racket/racket-prefs.rktd"
+                                                                                   ;"/etc/ssl/certs/ca-certificates.crt"
+                                                                                   ;"/etc/ssl/cert.pem"
+                                                                                   ;"/home/c/cs-110/.racket/racket-prefs.rktd"
                                                                                    ;; try to do the right thing for local testing
                                                                                    (find-system-path 'pref-file)
                                                                                    (let-values ([(base name is-dir) (split-path (find-system-path 'pref-file))])
                                                                                      (build-path base "_LOCKracket-prefs.rktd")))
-                                                                 #:allow-read  (list "/etc/ssl/cert.pem"
-                                                                                     "/usr/lib/ssl/cert.pem"
-                                                                                     "/usr/lib/ssl/certs")))])
+                                                                 #:allow-read  (list; "/etc/ssl/cert.pem"
+                                                                                     ;"/usr/lib/ssl/cert.pem"
+                                                                                     ;"/usr/lib/ssl/certs"
+                                                                                )))])
                                           ;; from here till we get inside grade-submission any errors are internal errors
                                           (with-handlers ([exn:fail? handle-internal-error])
                                             (let ([s
@@ -173,10 +167,9 @@ validity, and test thoroughness results are reported. No grade information is re
 (define (default-grader)
   (grade-submission 
     (weights (1)
-      (rubric-item 'other #t "No custom grader exists for this starter."))))
+      (rubric-item 'other #t "No grader defined for this starter."))))
 
 
-;; grade-* syntax
 
 (define-syntax (grade-submission stx)
   (syntax-case stx ()

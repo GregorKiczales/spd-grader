@@ -138,7 +138,7 @@
 			       new-context)))]
                 [(and (pair? sexp)
                       (eqv? (car sexp) '@signature))
-                 (cons (elt context stx (subst 'false #f sexp)) ;!!! make this go away, false is a symbol in this case not a value
+                 (cons (elt context stx (subst 'false #f sexp))
                        (loop (cdr lo-stx)
                              context))]
 		[else
