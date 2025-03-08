@@ -84,7 +84,7 @@ This solves problems about order of arguments.
                                       [rhs (caddr ce)])
                                   (and (calling-evaluator #f `(equal? ,rhs ,d1))
                                        (calling-evaluator #f `(equal? ,lhs ,d1))
-                                       (calling-evaluator #f `(equal? ,(subst d2 d1 lhs) ,d2)))))
+                                       (calling-evaluator #f `(equal? ,(replace-last-operand-to-fn lhs fn d2) ,d2)))))
                               tests))
                      "Copy test"))
 
@@ -97,12 +97,22 @@ This solves problems about order of arguments.
                                       [rhs (caddr ce)])
                                   (and (calling-evaluator #f `(equal? ,rhs ,v3))
                                        (calling-evaluator #f `(equal? ,lhs ,v3))
-                                       (calling-evaluator #f `(equal? ,(subst d4 d3 lhs) ,v4)))))
+                                       (calling-evaluator #f `(equal? ,(replace-last-operand-to-fn lhs fn d4) ,v4)))))
                               tests))
                      "Count test"))))
 
-;; !!! this subst uses equal? not eqv? consider changing the one in utils and testing
-(define (subst new old in)
-  (cond [(equal? in old) new]
-        [(cons? in) (cons (subst new old (car in)) (subst new old (cdr in)))]
-        [else in]))
+(define (replace-last-operand-to-fn in-exp fn-name new-operand)
+  ;; we should do this as a walk, but the walker is built for collecting things
+  ;; out of code, not for rewriting code. So hold your noses, we're going to
+  ;; just bash through s-expressions. It would be crazy for a 110 student to
+  ;; locally shadow the actual fold-function name.
+  (define (walk exp)
+    (cond [(and (pair? exp) (eqv? (car exp) fn-name))
+           (append (drop-right exp 1)
+                   (list new-operand))]
+          [(pair? exp)
+           (cons (walk (car exp))
+                 (walk (cdr exp)))]
+          [else exp]))
+  
+  (walk in-exp))
