@@ -110,18 +110,17 @@
                                                ;; errors in this region are from running the submission, not autograding
                                                (with-handlers ([exn:fail:resource? handle-resource-error]
                                                                [exn:fail? handle-submission-error])
+                                                 (logr (format "Making evaluator and evaluating file - ~a" filename))
                                                  (make-evaluator lang
                                                                  in
                                                                  #:requires '(spd-grader/tonka) ;grader runtime for playing in sandbox
-
-                                                                 ;; !!! for some reason getting rid of this dependency inversion doesn't work
-                                                                 ;; !!! even running just spd-grader (not inside the server) on the cs110
-                                                                 ;; !!! machine needs these. Not sure why.
+                                                                 ;; even when not running in the AG server, on the server loading
+                                                                 ;; racket/gui/base seems to need to load openssl. So we have these
+                                                                 ;; allows here.  Maybe when the server gets updated to a new racket
+                                                                 ;; this won't be true, but it probably will still be true because
+                                                                 ;; of the X bindings on the server
                                                                  #:allow-for-load (list
-                                                                                   ;; hard-coded for our server
-                                                                                   ;"/etc/ssl/certs/ca-certificates.crt"
                                                                                    "/etc/ssl/cert.pem"
-                                                                                   ;"/home/c/cs-110/.racket/racket-prefs.rktd"
                                                                                    ;; try to do the right thing for local testing
                                                                                    (find-system-path 'pref-file)
                                                                                    (let-values ([(base name is-dir) (split-path (find-system-path 'pref-file))])
@@ -146,6 +145,8 @@
                                                      (stxs  (call-with-input-bytes bytes (lambda (in) (read-syntaxes filename in))))
                                                      (lines (call-with-input-bytes bytes port->lines))
                                                      (elts  (parse-elts (stxs) (lines)))
+                                                     
+                                                     (logr (format "Calling grader - ~a" filename))
                                                      (grader))])
 
                                               ;; we now have a score, time to render it
