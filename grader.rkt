@@ -55,118 +55,124 @@
   (logr (format "autograde-file called ~a" filename))
   (with-handlers ([exn:fail?
                    (lambda (exn)
-                     (let ([msg (format "Internal error: grading ~a - ~a" filename (exn->string exn))])
-                       (logr (format "Error: ~a" msg))
+                     (let ([msg (format "Internal error: reading file ~a - ~a" filename (exn->string exn))])
+                       (logr (format "error: ~a" msg))
                        (displayln msg rpt)))])
-    
     (let ([bytes (file->bytes filename)])
-      (logr (format "File read to bytes ~a" filename))
-      (let ([grader
-             (with-handlers ([exn:fail?
-                              (lambda (exn)
-                                (let ([msg (format "Internal error: loading grader for ~a - ~a" filename (exn->string exn))])
-                                  (logr (format "Error: ~a" msg))
-                                  (display msg rpt)))])
-               (call-with-input-bytes bytes find-grader))])
-        (logr (format "Grader found ~a" filename))
-        (call-with-input-bytes bytes
-                               (lambda (in)
-                                 (read-line in)
-                                 (read-line in)
-                                 (let ([lang (line->language-level (read-line in))])
-                                   (parameterize ([sandbox-input                #f]
-                                                  [sandbox-output               #f]
-                                                  [sandbox-error-output         #f]
-                                                  [sandbox-propagate-exceptions #t]
-                                                  [error-value->string-handler (lambda (v s)
-                                                                                 ((current-value-printer) v))]
-                                                  [sandbox-eval-limits         EVAL-LIMITS])
+      (logr (format "file read to bytes ~a" filename))
 
-                                     (let ([abort-tag (make-continuation-prompt-tag)])
-                                       
-                                       (define (handle-resource-error exn)
-                                         (when (verbose-error-logging?)
-                                           (logr (format "Error: submission ~a used too much ~a." filename (exn:fail:resource-resource exn))))
-                                         (display-overall-grade 0
-                                                                (format "Error: submission used too much ~a" (exn:fail:resource-resource exn))
-                                                                rpt)
-                                         (abort-current-continuation abort-tag (lambda () (void))))
+      (with-handlers ([exn:fail?
+                       (lambda (exn)
+                         (let ([msg (format "Internal error: loading grader for ~a - ~a" filename (exn->string exn))])
+                           (logr (format "error: ~a" msg))
+                           (display msg rpt)))])
+        (let ([grader (call-with-input-bytes bytes find-grader)])
+          (logr (format "grader loaded ~a" filename))
+          
+          (with-handlers ([exn:fail?
+                           (lambda (exn)
+                             (let ([msg (format "Internal error: grading ~a - ~a" filename (exn->string exn))])
+                               (logr (format "error: ~a" msg))
+                               (displayln msg rpt)))])
+            
+            (call-with-input-bytes bytes
+                                   (lambda (in)
+                                     (read-line in)
+                                     (read-line in)
+                                     (let ([lang (line->language-level (read-line in))])
+                                       (parameterize ([sandbox-input                #f]
+                                                      [sandbox-output               #f]
+                                                      [sandbox-error-output         #f]
+                                                      [sandbox-propagate-exceptions #t]
+                                                      [error-value->string-handler (lambda (v s)
+                                                                                     ((current-value-printer) v))]
+                                                      [sandbox-eval-limits         EVAL-LIMITS])
 
-                                       (define (handle-submission-error exn)
-                                         (when (verbose-error-logging?)
-                                           (logr (format "Error: running submission ~a - ~a" filename (exn->string exn))))
-                                         (display-overall-grade 0
-                                                                (format "Error: running submission - ~a." (exn->string exn))
-                                                                rpt)
-                                         (abort-current-continuation abort-tag (lambda () (void))))
+                                         (let ([abort-tag (make-continuation-prompt-tag)])
+                                           
+                                           (define (handle-resource-error exn)
+                                             (when (verbose-error-logging?)
+                                               (logr (format "error: submission ~a used too much ~a." filename (exn:fail:resource-resource exn))))
+                                             (display-overall-grade 0
+                                                                    (format "Error: submission used too much ~a" (exn:fail:resource-resource exn))
+                                                                    rpt)
+                                             (abort-current-continuation abort-tag (lambda () (void))))
 
-                                       (define (handle-internal-error exn)
-                                         (logr (format "Error: Internal error for submission ~a - ~a" filename (exn->string exn)))
-                                         (display-overall-grade 100
-                                                                (format "Internal error: ~a" (exn->string exn))
-                                                                rpt)
-                                         (abort-current-continuation abort-tag (lambda () (void))))
+                                           (define (handle-submission-error exn)
+                                             (when (verbose-error-logging?)
+                                               (logr (format "error: running submission ~a - ~a" filename (exn->string exn))))
+                                             (display-overall-grade 0
+                                                                    (format "Error: running submission - ~a." (exn->string exn))
+                                                                    rpt)
+                                             (abort-current-continuation abort-tag (lambda () (void))))
 
-                                       
-                                       (call-with-continuation-prompt 
-                                        (lambda ()
-                                          (let ([e
-                                                 ;; errors in this region are from running the submission, not autograding
-                                                 (with-handlers ([exn:fail:resource? handle-resource-error]
-                                                                 [exn:fail? handle-submission-error])
-                                                   (logr (format "Making evaluator ~a" filename))
-                                                   (make-evaluator lang
-                                                                   in
-                                                                   #:requires '(spd-grader/tonka) ;grader runtime for playing in sandbox
-                                                                   ;; even when not running in the AG server, on the server loading
-                                                                   ;; racket/gui/base seems to need to load openssl. So we have these
-                                                                   ;; allows here.  Maybe when the server gets updated to a new racket
-                                                                   ;; this won't be true, but it probably will still be true because
-                                                                   ;; of the X bindings on the server
-                                                                   #:allow-for-load (list
-                                                                                     "/etc/ssl/cert.pem"
-                                                                                     ;; try to do the right thing for local testing
-                                                                                     (find-system-path 'pref-file)
-                                                                                     (let-values ([(base name is-dir) (split-path (find-system-path 'pref-file))])
-                                                                                       (build-path base "_LOCKracket-prefs.rktd")))
-                                                                   #:allow-read  (list "/etc/ssl/cert.pem"
-                                                                                       "/usr/lib/ssl/cert.pem"
-                                                                                       "/usr/lib/ssl/certs")))])
-                                            ;; from here till we get inside grade-submission any errors are internal errors
-                                            (with-handlers ([exn:fail? handle-internal-error])
-                                              (let ([s
-                                                     (parameterize ([evaluator 
-                                                                     (lambda (x)
-                                                                       ;; these are errors when the grader makes additional calls to the evaluator
-                                                                       ;; we abort on resource errors and let others through
-                                                                       (with-handlers ([exn:fail:resource? handle-resource-error])
-                                                                         (e (if (string? x) `(identity ,x) x))))]
-                                                                    [logger    logr]
-                                                                    [context   '()]
-                                                                    [stxs      #f]
-                                                                    [elts      #f]
-                                                                    [lines     #f])
-                                                       (stxs  (call-with-input-bytes bytes (lambda (in) (read-syntaxes filename in))))
-                                                       (lines (call-with-input-bytes bytes port->lines))
-                                                       (elts  (parse-elts (stxs) (lines)))
-                                                       
-                                                       (logr (format "Calling grader ~a" filename))
-                                                       (grader))])
+                                           (define (handle-internal-error exn)
+                                             (logr (format "error: Internal error for submission ~a - ~a" filename (exn->string exn)))
+                                             (display-overall-grade 100
+                                                                    (format "Internal error: ~a" (exn->string exn))
+                                                                    rpt)
+                                             (abort-current-continuation abort-tag (lambda () (void))))
 
-                                                ;; we now have a score, time to render it
-                                                (parameterize ([verbose? verb?]
-                                                               [early? earl?])
-                                                  (cond [earl?
-                                                         (displayln/f "\n\nAssignment submitted for regrading before end of cooldown - only style, signature, test
+                                           
+                                           (call-with-continuation-prompt 
+                                            (lambda ()
+                                              (let ([e
+                                                     ;; errors in this region are from running the submission, not autograding
+                                                     (with-handlers ([exn:fail:resource? handle-resource-error]
+                                                                     [exn:fail? handle-submission-error])
+                                                       (logr (format "making evaluator ~a" filename))
+                                                       (make-evaluator lang
+                                                                       in
+                                                                       #:requires '(spd-grader/tonka) ;grader runtime for playing in sandbox
+                                                                       ;; even when not running in the AG server, on the server loading
+                                                                       ;; racket/gui/base seems to need to load openssl. So we have these
+                                                                       ;; allows here.  Maybe when the server gets updated to a new racket
+                                                                       ;; this won't be true, but it probably will still be true because
+                                                                       ;; of the X bindings on the server
+                                                                       #:allow-for-load (list
+                                                                                         "/etc/ssl/cert.pem"
+                                                                                         ;; try to do the right thing for local testing
+                                                                                         (find-system-path 'pref-file)
+                                                                                         (let-values ([(base name is-dir) (split-path (find-system-path 'pref-file))])
+                                                                                           (build-path base "_LOCKracket-prefs.rktd")))
+                                                                       #:allow-read  (list "/etc/ssl/cert.pem"
+                                                                                           "/usr/lib/ssl/cert.pem"
+                                                                                           "/usr/lib/ssl/certs")))])
+                                                ;; from here till we get inside grade-submission any errors are internal errors
+                                                (with-handlers ([exn:fail? handle-internal-error])
+                                                  (let ([s
+                                                         (parameterize ([evaluator 
+                                                                         (lambda (x)
+                                                                           ;; these are errors when the grader makes additional calls to the evaluator
+                                                                           ;; we abort on resource errors and let others through
+                                                                           (with-handlers ([exn:fail:resource? handle-resource-error])
+                                                                             (e (if (string? x) `(identity ,x) x))))]
+                                                                        [logger    logr]
+                                                                        [context   '()]
+                                                                        [stxs      #f]
+                                                                        [elts      #f]
+                                                                        [lines     #f])
+                                                           (stxs  (call-with-input-bytes bytes (lambda (in) (read-syntaxes filename in))))
+                                                           (lines (call-with-input-bytes bytes port->lines))
+                                                           (elts  (parse-elts (stxs) (lines)))
+                                                           
+                                                           (logr (format "calling grader ~a" filename))
+                                                           (grader))])
+
+                                                    ;; we now have a score, time to render it
+                                                    (parameterize ([verbose? verb?]
+                                                                   [early? earl?])
+                                                      (cond [earl?
+                                                             (displayln/f "\n\nAssignment submitted for regrading before end of cooldown - only style, signature, test
 validity, and test thoroughness results are reported. No grade information is reported.\n\n" rpt)
-                                                         (display-score s rpt #f)
-                                                         (score-m s)]
-                                                        [else
-                                                         (display-overall-grade (inexact->exact (round (* 100 (score-m s)))) "" rpt)
-                                                         (displayln/f "\n\n" rpt)
-                                                         (display-score s rpt #t)
-                                                         (score-m s)]))))))
-                                        abort-tag))))))))))
+                                                             (display-score s rpt #f)
+                                                             (score-m s)]
+                                                            [else
+                                                             (display-overall-grade (inexact->exact (round (* 100 (score-m s)))) "" rpt)
+                                                             (displayln/f "\n\n" rpt)
+                                                             (display-score s rpt #t)
+                                                             (score-m s)]))))))
+                                            abort-tag))))))))))))
 
 
 (define (default-grader)
