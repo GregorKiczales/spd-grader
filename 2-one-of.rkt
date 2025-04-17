@@ -59,7 +59,7 @@
            (combine-scores
             (weights* 1.0 '(*)
               (for/list ([n     (in-naturals 0)]
-                         [sol-q sol-qs])
+                         [sol-q (drop-right sol-qs 1)]);leave else behind
                 (rubric-item 'template-intact
                              (and (pair? sub-qs)
                                   (> (length sub-qs) n)
