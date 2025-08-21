@@ -52,7 +52,7 @@
 
 
 (define (autograde-file filename [verb? #t] [earl? #f] [rpt (current-output-port)] [logr displayln] [make-evaluator make-evaluator])
-  (logr (format "autograde-file   ~a" filename))
+ ;(logr (format "autograde-file   ~a" filename))
   
   (with-handlers ([exn:fail?
                    (lambda (exn)
@@ -60,7 +60,7 @@
                        (logr (format "error: ~a" msg))
                        (displayln msg rpt)))])
     (let ([bytes (file->bytes filename)])
-      (logr (format "bytes loaded     ~a" filename))
+     ;(logr (format "bytes loaded     ~a" filename))
 
       (with-handlers ([exn:fail?
                        (lambda (exn)
@@ -68,7 +68,7 @@
                            (logr (format "error: ~a" msg))
                            (display msg rpt)))])
         (let ([grader (call-with-input-bytes bytes find-grader)])
-          (logr (format "grader loaded    ~a" filename))
+         ;(logr (format "grader loaded    ~a" filename))
           
           (with-handlers ([exn:fail?
                            (lambda (exn)
@@ -122,7 +122,7 @@
                                                    ;; errors in this region are from running the submission, not autograding
                                                    (with-handlers ([exn:fail:resource? handle-resource-error]
                                                                    [exn:fail? handle-submission-error])
-                                                     (logr (format "making evaluator ~a" filename))
+                                                    ;(logr (format "making evaluator ~a" filename))
                                                      (make-evaluator lang
                                                                      in
                                                                      #:requires '(spd-grader/tonka) ;grader runtime for playing in sandbox
@@ -154,14 +154,13 @@
                                                                        [stxs      (call-with-input-bytes bytes (lambda (in) (read-syntaxes filename in)))]
                                                                        [lines     (call-with-input-bytes bytes port->lines)]
                                                                        [elts      (parse-elts (stxs) (lines))])
-                                                        ;(elts (parse-elts (stxs) (lines)))
-                                                         (logr (format "calling grader   ~a" filename))
+                                                        ;(logr (format "calling grader   ~a" filename))
                                                          (grader))])
 
                                                   ;; we now have a score, time to render it
                                                   (parameterize ([verbose? verb?]
                                                                  [early? earl?])
-                                                    (logr (format "reporting score  ~a" filename))
+                                                   ;(logr (format "reporting score  ~a" filename))
                                                     (cond [earl?
                                                            (displayln/f "\n\nAssignment submitted for regrading before end of cooldown - only style, signature, test
 validity, and test thoroughness results are reported. No grade information is reported.\n\n" rpt)
